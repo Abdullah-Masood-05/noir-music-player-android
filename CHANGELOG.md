@@ -3,6 +3,16 @@
 Release notes for Noir Player. Each `## [x.y.z] - Title` section becomes the
 notes of the matching GitHub release.
 
+## [2.0.2] - Discover covers are back
+
+### 🎨 Discover
+- **Every Discover song shows its album cover again**, in the list, the player, the mini player and on the lock screen. Covers are looked up by song and artist from Deezer and Apple Music, and only a cover for the same song and artist is used: when there's no sure match, the plain placeholder stays instead of a wrong picture.
+- **Covers load quickly and only once.** They're remembered on your phone, so a song you've seen before shows its cover straight away, even offline.
+- Remixes, live and slowed versions get their own covers, separate from the original song.
+
+### 📦 Installing
+- **2.0.2 updates over 2.0.1 in place.** Your playlists and settings stay as they are.
+
 ## [2.0.1] - Lock screen controls fixed, seek buttons added
 
 ### 🔒 Lock screen & system media controls

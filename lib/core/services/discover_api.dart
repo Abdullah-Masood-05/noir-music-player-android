@@ -457,12 +457,20 @@ List<DiscoveredTrack> parseTracks(
   return result;
 }
 
-/// The largest non-empty image URL in a Last.fm `image` list, or ''.
+/// Last.fm's grey star image, which it sends when it has no artwork.
+const String lastFmPlaceholderHash = '2a96cbd8b46e442fc41c2b86b821562f';
+
+/// The largest non-empty image URL in a Last.fm `image` list, or '' (also
+/// when it is only Last.fm's grey-star placeholder).
 String largestImage(dynamic images) {
   if (images is! List) return '';
   for (final image in images.reversed) {
     final text = image is Map ? image['#text'] : null;
-    if (text is String && text.isNotEmpty) return text;
+    if (text is String &&
+        text.isNotEmpty &&
+        !text.contains(lastFmPlaceholderHash)) {
+      return text;
+    }
   }
   return '';
 }

@@ -28,7 +28,10 @@ class _AboutScreenState extends State<AboutScreen> {
     (Icons.library_music, 'Local library with a dedicated Music‑folder tab'),
     (Icons.play_circle, 'Background playback with notification & lock‑screen controls'),
     (Icons.queue_music, 'Playlists and favourites'),
-    (Icons.explore, 'Online discovery and downloads'),
+    (
+      Icons.explore,
+      'Online discovery and downloads (artwork from Apple Music and Deezer)',
+    ),
     (Icons.graphic_eq, 'Equalizer, sleep timer and playback speed'),
   ];
 

@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/discovered_track.dart';
+import '../../core/services/cover_lookup.dart';
 import '../../core/services/discover_api.dart';
 import '../../core/services/music_discovery_service.dart';
+import '../../core/state/covers.dart';
 import '../../core/state/library.dart';
 import '../../core/state/playback.dart';
 import '../../core/state/settings.dart';
@@ -93,6 +97,13 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   Future<void> _playTrack(DiscoveredTrack track) async {
     final key = _keyFor(track);
     setState(() => _loadingTrack = key);
+    // The lock screen, notification and player show this cover; look it up
+    // while the audio link resolves.
+    final cover = track.imageUrl.isEmpty
+        ? ref
+              .read(coverLookupProvider)
+              .coverFor(track.artist, track.name, urgent: true)
+        : Future<Cover?>.value(null);
     try {
       final videoId = await _discoveryService.fetchYoutubeVideoId(
         track.name,
@@ -104,13 +115,28 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       // notification and is fully controllable.
       final handler = ref.read(audioHandlerProvider);
       if (handler == null) throw StateError('The audio service is not running');
+      final art = track.imageUrl.isNotEmpty
+          ? track.imageUrl
+          : (await cover.timeout(
+              const Duration(seconds: 2),
+              onTimeout: () => null,
+            ))?.large;
+      final id = 'discover:$key';
       await handler.playStream(
-        id: 'discover:$key',
+        id: id,
         url: mp3Url,
         title: track.name,
         artist: track.artist,
-        artUri: track.imageUrl,
+        artUri: art,
       );
+      if (art == null) {
+        // Still looking: give the playing song its cover when it arrives.
+        unawaited(
+          cover.then((c) {
+            if (c != null) handler.setArtwork(id, Uri.parse(c.large));
+          }),
+        );
+      }
       if (!mounted) return;
       setState(() => _loadingTrack = null);
       widget.onNavigateToPlayer();
@@ -404,21 +430,54 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   }
 
   Widget _artwork(DiscoveredTrack track, ThemeData theme) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: DiscoverArtwork(track: track, size: 56),
+    );
+  }
+}
+
+/// A Discover track's artwork: the URL it came with, otherwise a cover looked
+/// up by artist and title (shown at once when it is already cached).
+class DiscoverArtwork extends ConsumerWidget {
+  const DiscoverArtwork({super.key, required this.track, required this.size});
+
+  final DiscoveredTrack track;
+  final double size;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     final placeholder = Container(
-      width: 56,
-      height: 56,
+      width: size,
+      height: size,
       color: theme.colorScheme.primary.withValues(alpha: 0.12),
       child: Icon(Icons.music_note, color: theme.colorScheme.primary),
     );
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: track.imageUrl.isEmpty
-          ? placeholder
-          : RemoteArtwork(
-              url: track.imageUrl,
-              size: 56,
-              placeholder: placeholder,
-            ),
+    if (track.imageUrl.isNotEmpty) {
+      return RemoteArtwork(
+        url: track.imageUrl,
+        size: size,
+        placeholder: placeholder,
+      );
+    }
+
+    final lookup = ref.read(coverLookupProvider);
+    final Cover? cover;
+    if (lookup.isKnown(track.artist, track.name)) {
+      cover = lookup.peek(track.artist, track.name);
+    } else {
+      cover = ref
+          .watch(
+            discoverCoverProvider((artist: track.artist, title: track.name)),
+          )
+          .value;
+    }
+    if (cover == null) return placeholder;
+    return RemoteArtwork(
+      url: cover.thumb,
+      size: size,
+      placeholder: placeholder,
     );
   }
 }
