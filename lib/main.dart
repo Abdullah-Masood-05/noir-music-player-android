@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/services/audio_handler.dart';
+import 'core/state/covers.dart';
 import 'core/state/playback.dart';
 import 'core/state/playlists.dart';
 import 'core/state/settings.dart';
@@ -66,6 +67,7 @@ class _SaveOnBackground with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       _container.read(audioHandlerProvider)?.saveLastSong();
+      _container.read(coverLookupProvider).flush();
     }
   }
 }

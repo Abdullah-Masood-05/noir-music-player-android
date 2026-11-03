@@ -343,6 +343,8 @@ server, or directly with your own key for any service you added one for in Setti
 | [`flutter_riverpod`](https://pub.dev/packages/flutter_riverpod) · [`shared_preferences`](https://pub.dev/packages/shared_preferences) | State & persistence |
 | [`http`](https://pub.dev/packages/http) | Networking & file download |
 | [`cached_network_image`](https://pub.dev/packages/cached_network_image) | Discover artwork, cached between launches |
+
+> Discover album covers are looked up by song and artist in the [Deezer](https://developers.deezer.com/api) and [iTunes Search](https://performance-partners.apple.com/search-api) APIs (no account or key). Only the song title and artist are sent, and covers are cached on the device.
 | [`path_provider`](https://pub.dev/packages/path_provider) | Locating device folders for downloads |
 | [`flutter_animate`](https://pub.dev/packages/flutter_animate) | UI animations |
 

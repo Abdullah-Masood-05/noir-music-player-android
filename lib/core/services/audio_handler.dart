@@ -441,6 +441,18 @@ class AudioPlayerHandler extends BaseAudioHandler {
     );
   });
 
+  /// Gives the item [id] its artwork if it is still the one loaded (a
+  /// Discover cover found after playback started), so the player,
+  /// notification and lock screen show it.
+  void setArtwork(String id, Uri artUri) {
+    final current = mediaItem.value;
+    if (current == null || current.id != id || current.artUri != null) return;
+    final withArt = current.copyWith(artUri: artUri);
+    mediaItem.add(withArt);
+    final items = queue.value;
+    if (items.length == 1 && items.first.id == id) queue.add([withArt]);
+  }
+
   Future<void> playNext() => _player.seekToNext();
 
   Future<void> playPrevious() => _player.seekToPrevious();
