@@ -3,6 +3,11 @@
 Release notes for Noir Player. Each `## [x.y.z] - Title` section becomes the
 notes of the matching GitHub release.
 
+## [Unreleased]
+
+### 🎨 Look
+- **New, sharper app logo**: the same red wave and level bars on a deeper black, used for the app icon, the launch screen and the iOS icon.
+
 ## [2.0.2] - Discover covers are back
 
 ### 🎨 Discover
