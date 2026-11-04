@@ -7,25 +7,25 @@
 **A sleek, lightweight Flutter music player** — play your local library, discover trending tracks, and download songs straight to your device.
 
 <p>
-  <a href="https://github.com/Abdullah-Masood-05/NoirPlayer/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/Abdullah-Masood-05/NoirPlayer?label=release&color=blue"></a>
-  <a href="https://github.com/Abdullah-Masood-05/NoirPlayer/releases/latest"><img alt="Downloads" src="https://img.shields.io/github/downloads/Abdullah-Masood-05/NoirPlayer/total?color=brightgreen"></a>
+  <a href="https://github.com/Abdullah-Masood-05/noir-music-player-android/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/Abdullah-Masood-05/noir-music-player-android?label=release&color=blue"></a>
+  <a href="https://github.com/Abdullah-Masood-05/noir-music-player-android/releases/latest"><img alt="Downloads" src="https://img.shields.io/github/downloads/Abdullah-Masood-05/noir-music-player-android/total?color=brightgreen"></a>
   <a href="https://flutter.dev"><img alt="Flutter" src="https://img.shields.io/badge/Flutter-3.35.7-02569B?logo=flutter&logoColor=white"></a>
   <a href="https://dart.dev"><img alt="Dart" src="https://img.shields.io/badge/Dart-3.9+-0175C2?logo=dart&logoColor=white"></a>
   <img alt="Platform" src="https://img.shields.io/badge/Platform-Android%20%7C%20iOS-3DDC84?logo=android&logoColor=white">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
-  <a href="https://github.com/Abdullah-Masood-05/NoirPlayer/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/Abdullah-Masood-05/NoirPlayer?style=flat&logo=github&color=E53935"></a>
-  <a href="https://github.com/Abdullah-Masood-05/noir-player-desktop-app"><img alt="Desktop" src="https://img.shields.io/badge/Desktop-Windows%20%7C%20macOS%20%7C%20Linux-E53935?logo=rust&logoColor=white"></a>
+  <a href="https://github.com/Abdullah-Masood-05/noir-music-player-android/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/Abdullah-Masood-05/noir-music-player-android?style=flat&logo=github&color=E53935"></a>
+  <a href="https://github.com/Abdullah-Masood-05/noir-music-player-desktop"><img alt="Desktop" src="https://img.shields.io/badge/Desktop-Windows%20%7C%20macOS%20%7C%20Linux-E53935?logo=rust&logoColor=white"></a>
 </p>
 
 <p>
-  <a href="https://github.com/Abdullah-Masood-05/NoirPlayer/releases/latest"><b>📥 Download for Android or iPhone</b></a>
+  <a href="https://github.com/Abdullah-Masood-05/noir-music-player-android/releases/latest"><b>📥 Download for Android or iPhone</b></a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/Abdullah-Masood-05/noir-player-desktop-app/releases/latest"><b>🖥️ Get it for desktop</b></a>
+  <a href="https://github.com/Abdullah-Masood-05/noir-music-player-desktop/releases/latest"><b>🖥️ Get it for desktop</b></a>
 </p>
 
 </div>
 
-> ⭐ **Enjoying Noir Player?** If it's useful to you, please [star it on GitHub](https://github.com/Abdullah-Masood-05/NoirPlayer). It's free and it helps other people find it.
+> ⭐ **Enjoying Noir Player?** If it's useful to you, please [star it on GitHub](https://github.com/Abdullah-Masood-05/noir-music-player-android). It's free and it helps other people find it.
 
 ---
 
@@ -63,7 +63,7 @@ Noir Player is a small, focused Flutter app that:
 5. **Streams & downloads** — preview tracks and save them as MP3 to your device's music folder.
 6. **Tailors playback** — skip back / forward by your own seek interval, sleep timer, playback speed, resume‑after‑a‑call and more, all in a sectioned Settings page reached from the side drawer.
 
-> 🖥️ **On a computer?** [Noir Player for Desktop](https://github.com/Abdullah-Masood-05/noir-player-desktop-app) is the same player rebuilt in Rust for Windows, macOS and Linux.
+> 🖥️ **On a computer?** [Noir Player for Desktop](https://github.com/Abdullah-Masood-05/noir-music-player-desktop) is the same player rebuilt in Rust for Windows, macOS and Linux.
 
 ---
 
@@ -87,7 +87,7 @@ Noir Player is a small, focused Flutter app that:
 
 ## 📥 Download
 
-Every release on the **[Releases](https://github.com/Abdullah-Masood-05/NoirPlayer/releases/latest)** page has
+Every release on the **[Releases](https://github.com/Abdullah-Masood-05/noir-music-player-android/releases/latest)** page has
 an Android APK and an iOS build, plus a `SHA256SUMS` file to check your download against.
 
 **Android** — download `NoirPlayer-vX.Y.Z.apk` on your phone (Android 7.0 or newer), open it and tap
@@ -133,11 +133,11 @@ device aren't carried over. From 1.2.0 on, updates install in place: 1.2.2 insta
 
 ## 🖥️ Noir Player for Desktop
 
-Noir Player started here, on Android. The **[desktop edition](https://github.com/Abdullah-Masood-05/noir-player-desktop-app)** carries the
+Noir Player started here, on Android. The **[desktop edition](https://github.com/Abdullah-Masood-05/noir-music-player-desktop)** carries the
 same idea to the computer: a local library, the red‑on‑black look, and Discover — rebuilt
 from scratch in **Rust** with **GPUI Kit** rather than Flutter.
 
-| | 📱 Mobile (this repo) | 🖥️ [Desktop](https://github.com/Abdullah-Masood-05/noir-player-desktop-app) |
+| | 📱 Mobile (this repo) | 🖥️ [Desktop](https://github.com/Abdullah-Masood-05/noir-music-player-desktop) |
 |---|---|---|
 | **Built with** | Flutter · Dart | Rust · GPUI Kit |
 | **Runs on** | Android · iOS (unsigned IPA) | Windows · macOS · Linux |
@@ -147,7 +147,7 @@ from scratch in **Rust** with **GPUI Kit** rather than Flutter.
 | **Discover** | Last.fm search, YouTube → MP3 download, through Noir Player's server | The same services, through the same server |
 
 <p>
-  <a href="https://github.com/Abdullah-Masood-05/noir-player-desktop-app/releases/latest"><b>📥 Download for Windows, macOS or Linux</b></a>
+  <a href="https://github.com/Abdullah-Masood-05/noir-music-player-desktop/releases/latest"><b>📥 Download for Windows, macOS or Linux</b></a>
 </p>
 
 ---
@@ -228,7 +228,7 @@ flutter --version
 ### Installation
 
 ```bash
-git clone https://github.com/Abdullah-Masood-05/NoirPlayer.git
+git clone https://github.com/Abdullah-Masood-05/noir-music-player-android.git
 cd NoirPlayer
 flutter pub get
 ```
@@ -374,6 +374,6 @@ Distributed under the **MIT License**. See [LICENSE](LICENSE) for details.
 
 **🎧 Enjoy the music with Noir Player!**
 
-📱 Android · iOS · 🖥️ [Windows, macOS & Linux](https://github.com/Abdullah-Masood-05/noir-player-desktop-app)
+📱 Android · iOS · 🖥️ [Windows, macOS & Linux](https://github.com/Abdullah-Masood-05/noir-music-player-desktop)
 
 </div>
