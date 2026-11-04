@@ -159,6 +159,13 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     String? errorMessage;
     final result = await _discoveryService.downloadTrack(
       track,
+      // Saved inside the file, so the Library shows the album cover.
+      coverUrl: track.imageUrl.isEmpty
+          ? ref
+                .read(coverLookupProvider)
+                .coverFor(track.artist, track.name, urgent: true)
+                .then((c) => c?.large, onError: (Object _) => null)
+          : null,
       onProgress: (received, total) {
         if (total > 0 && mounted) {
           setState(() => _downloadProgress[key] = received / total);
