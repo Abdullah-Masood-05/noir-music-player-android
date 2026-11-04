@@ -78,7 +78,7 @@ env:
 jobs:
   prepare:
     name: Validate tag and find CI builds
-    if: github.repository == 'Abdullah-Masood-05/NoirPlayer'
+    if: github.repository == 'Abdullah-Masood-05/noir-music-player-android'
     runs-on: ubuntu-24.04
     timeout-minutes: 100
     permissions:
