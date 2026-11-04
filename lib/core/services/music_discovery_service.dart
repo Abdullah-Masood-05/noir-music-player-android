@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -11,6 +12,7 @@ import '../models/discovered_track.dart';
 import '../state/library.dart';
 import '../state/settings.dart';
 import 'discover_api.dart';
+import 'id3_tagger.dart';
 
 /// Outcome of a download attempt.
 enum DownloadResult {
@@ -143,8 +145,12 @@ class MusicDiscoveryService {
 
   /// Full download flow with de-duplication: resolves the source, saves the
   /// MP3 and records the track so it cannot be downloaded twice.
+  ///
+  /// The saved file is tagged with the track's title and artist and, when
+  /// [coverUrl] gives one, its album cover, so the Library shows them.
   Future<DownloadResult> downloadTrack(
     DiscoveredTrack track, {
+    Future<String?>? coverUrl,
     void Function(int received, int total)? onProgress,
     void Function(String message)? onError,
   }) async {
@@ -174,6 +180,7 @@ class MusicDiscoveryService {
         mp3Url,
         track.name,
         onProgress: onProgress,
+        tag: (file) => _tag(file, track, coverUrl),
       );
       if (savedUri == null) return DownloadResult.failed;
 
@@ -237,6 +244,7 @@ class MusicDiscoveryService {
     String url,
     String rawFilename, {
     Function(int received, int total)? onProgress,
+    Future<void> Function(File file)? tag,
   }) async {
     try {
       var filename = _sanitizeFileName(rawFilename);
@@ -262,6 +270,8 @@ class MusicDiscoveryService {
       }
 
       await _download(url, filePath, onProgress);
+      // Before the media scan, so the Library reads the new tags.
+      if (tag != null) await tag(File(filePath));
 
       // Make the new file visible in the media library straight away
       // (Android only; on iOS the file stays in the app's sandbox).
@@ -311,6 +321,55 @@ class MusicDiscoveryService {
       rethrow;
     }
     await sink.close();
+  }
+
+  /// Largest cover picture embedded in a download.
+  static const int _maxCoverBytes = 5 * 1024 * 1024;
+
+  /// Writes [track]'s title, artist and cover into the downloaded [file].
+  /// Never fails the download: without a cover the file keeps its own.
+  Future<void> _tag(
+    File file,
+    DiscoveredTrack track,
+    Future<String?>? coverUrl,
+  ) async {
+    try {
+      final url = track.imageUrl.isNotEmpty
+          ? track.imageUrl
+          : await coverUrl?.timeout(
+              const Duration(seconds: 15),
+              onTimeout: () => null,
+            );
+      await Id3Tagger.write(
+        file,
+        title: track.name,
+        artist: track.artist,
+        cover: url == null ? null : await _fetchCover(url),
+      );
+    } catch (e) {
+      _logError('Tagging failed for ${file.path}: $e');
+    }
+  }
+
+  /// The picture at [url], or null if it isn't a JPEG or PNG under 5 MB.
+  Future<Uint8List?> _fetchCover(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.scheme != 'https') return null;
+    try {
+      final response = await _client
+          .get(uri)
+          .timeout(const Duration(seconds: 15));
+      final bytes = response.bodyBytes;
+      if (response.statusCode != 200 ||
+          bytes.length > _maxCoverBytes ||
+          Id3Tagger.imageMime(bytes) == null) {
+        return null;
+      }
+      return bytes;
+    } catch (e) {
+      _logError('Cover download failed: $e');
+      return null;
+    }
   }
 
   // ---------------------------------------------------------------------------

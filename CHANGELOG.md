@@ -3,6 +3,12 @@
 Release notes for Noir Player. Each `## [x.y.z] - Title` section becomes the
 notes of the matching GitHub release.
 
+## [Unreleased]
+
+### ⬇️ Downloads
+- **Downloaded songs keep their album cover.** The cover is saved inside the MP3, so it shows in the Library, the player, the lock screen and other music apps, instead of the letterboxed video thumbnail some downloads came with.
+- Downloads are also tagged with the song's proper title and artist, rather than the video's title and channel name.
+
 ## [2.0.2] - Discover covers are back
 
 ### 🎨 Discover
