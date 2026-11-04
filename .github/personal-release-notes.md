@@ -6,7 +6,7 @@ This build exists only to show Noir Player in **OnePlus / OPPO Live Alerts** (th
 **What's different from the normal app**
 - It uses the package name `com.blueocean.huoledj`, which belongs to an unrelated music app on that allowlist. Noir Player is not affiliated with that app.
 - It installs **next to** the normal Noir Player as a separate app called **Noir Player Live**, with its own library scan, playlists and settings.
-- Built from branch [`personal/oneplus-live-alerts`](https://github.com/Abdullah-Masood-05/NoirPlayer/tree/personal/oneplus-live-alerts) (same code as Noir Player plus the package name and app label).
+- Built from branch [`personal/oneplus-live-alerts`](https://github.com/Abdullah-Masood-05/noir-music-player-android/tree/personal/oneplus-live-alerts) (same code as Noir Player plus the package name and app label).
 
 **Known caveats**
 - If the app that really owns `com.blueocean.huoledj` is installed, this build can't be installed (and vice versa).

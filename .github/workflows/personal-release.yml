@@ -57,7 +57,7 @@ env:
 jobs:
   publish:
     name: Publish prerelease
-    if: github.repository == 'Abdullah-Masood-05/NoirPlayer'
+    if: github.repository == 'Abdullah-Masood-05/noir-music-player-android'
     runs-on: ubuntu-24.04
     timeout-minutes: 80
     permissions:
