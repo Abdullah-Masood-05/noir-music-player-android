@@ -13,6 +13,7 @@ import '../state/library.dart';
 import '../state/settings.dart';
 import 'discover_api.dart';
 import 'id3_tagger.dart';
+import 'stream_check.dart';
 
 /// Outcome of a download attempt.
 enum DownloadResult {
@@ -98,6 +99,9 @@ class MusicDiscoveryService {
   Future<String> fetchYoutubeVideoId(String trackName, String artistName) =>
       _api.findVideoId(trackName, artistName);
 
+  /// Why the audio link [url] can't be played or downloaded.
+  Future<StreamCheck> checkStreamUrl(String url) => checkStream(_client, url);
+
   /// A downloadable audio link for [videoId].
   Future<String> getDownloadUrl(String videoId) =>
       _api.resolveAudioLink(videoId);
@@ -182,7 +186,13 @@ class MusicDiscoveryService {
         onProgress: onProgress,
         tag: (file) => _tag(file, track, coverUrl),
       );
-      if (savedUri == null) return DownloadResult.failed;
+      if (savedUri == null) {
+        final check = await checkStreamUrl(mp3Url);
+        if (check.problem != StreamProblem.none) {
+          onError?.call(check.message('download'));
+        }
+        return DownloadResult.failed;
+      }
 
       await _markDownloaded(key);
       return DownloadResult.success;

@@ -13,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/playlist_model.dart';
 import 'media_controls.dart';
+import 'now_playing.dart';
 import '../state/settings.dart';
 
 /// Starts the audio service. The handler reads and updates settings through
@@ -224,7 +225,21 @@ class AudioPlayerHandler extends BaseAudioHandler {
     } else {
       return;
     }
-    // Emit immediately so the title/artist update even before artwork loads.
+    // This runs on every playback event. For the song already showing, only
+    // add what's new (its length once loaded), so the progress bar works.
+    final current = mediaItem.value;
+    final update = nowPlayingUpdate(
+      current: current,
+      item: item,
+      loadedDuration: _loadedDuration(index),
+    );
+    if (current != null && current.id == item.id) {
+      if (update != null) mediaItem.add(update);
+      return;
+    }
+    // A new song: emit immediately so the title/artist update even before
+    // artwork loads.
+    item = update ?? item;
     mediaItem.add(item);
     _saveLastSong();
 
@@ -245,10 +260,28 @@ class AudioPlayerHandler extends BaseAudioHandler {
       queue.add(newQueue);
     }
 
-    // Only update the now-playing item if it's still this song.
-    if (mediaItem.value?.id == item.id) {
-      mediaItem.add(item);
+    // Only update the now-playing item if it's still this song, keeping
+    // what it learned while the artwork loaded (such as its length).
+    final now = mediaItem.value;
+    if (now != null && now.id == item.id) {
+      mediaItem.add(now.copyWith(artUri: uri));
     }
+  }
+
+  /// The player's length for the song at [index], once it has loaded. Read
+  /// from that song's own source, which starts without a length and gets one
+  /// only from its own playback events, so a previous song's length (still in
+  /// the last event while a new song loads) is never used.
+  Duration? _loadedDuration(int index) {
+    final sequence = _player.sequence;
+    if (index >= sequence.length) return null;
+    final event = _player.playbackEvent;
+    final loaded =
+        event.processingState == ProcessingState.ready ||
+        event.processingState == ProcessingState.completed;
+    return loaded && event.currentIndex == index
+        ? sequence[index].duration
+        : null;
   }
 
   /// Extract embedded artwork and persist it to a cache file, returning a
@@ -453,6 +486,20 @@ class AudioPlayerHandler extends BaseAudioHandler {
     if (items.length == 1 && items.first.id == id) queue.add([withArt]);
   }
 
+  /// After the Discover stream [id] failed to load: stop, and clear it from
+  /// the mini player, notification and queue rather than leave it showing as
+  /// the song playing. Nothing happens if another song has started since.
+  Future<void> clearFailedStream(String id) async {
+    if (mediaItem.value?.id != id) return;
+    _playIntent = false;
+    await _player.stop();
+    if (mediaItem.value?.id != id) return;
+    mediaItem.add(null);
+    queue.add(const []);
+    _songs = [];
+    _sourceMatchesQueue = false;
+  }
+
   Future<void> playNext() => _player.seekToNext();
 
   Future<void> playPrevious() => _player.seekToPrevious();
@@ -546,7 +593,10 @@ class AudioPlayerHandler extends BaseAudioHandler {
   }
 
   @override
-  Future<void> seek(Duration position) => _player.seek(position);
+  Future<void> seek(Duration position) async {
+    await _player.seek(position);
+    _saveLastSong(); // a seek while paused is otherwise not remembered
+  }
 
   @override
   Future<void> fastForward() => _seekBy(_settings.seekInterval);
@@ -560,6 +610,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
     if (target < Duration.zero) target = Duration.zero;
     if (duration > Duration.zero && target > duration) target = duration;
     await _player.seek(target);
+    _saveLastSong();
   }
 
   /// Change playback speed and persist it.
