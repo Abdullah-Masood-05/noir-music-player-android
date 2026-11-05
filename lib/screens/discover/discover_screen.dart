@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:just_audio/just_audio.dart' show PlayerException, PlayerInterruptedException;
 
 import '../../core/models/discovered_track.dart';
 import '../../core/services/cover_lookup.dart';
@@ -36,6 +37,10 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   bool _isSearching = false;
   String? _loadingTrack;
   final Map<String, double> _downloadProgress = {};
+
+  /// Counts plays started here; a slower, older play stops once a newer one
+  /// has started.
+  int _playGeneration = 0;
 
   String _keyFor(DiscoveredTrack t) => '${t.name}-${t.artist}';
 
@@ -96,6 +101,8 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
 
   Future<void> _playTrack(DiscoveredTrack track) async {
     final key = _keyFor(track);
+    final generation = ++_playGeneration;
+    bool superseded() => generation != _playGeneration;
     setState(() => _loadingTrack = key);
     // The lock screen, notification and player show this cover; look it up
     // while the audio link resolves.
@@ -109,7 +116,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         track.name,
         track.artist,
       );
-      final mp3Url = await _discoveryService.getDownloadUrl(videoId);
+      var mp3Url = await _discoveryService.getDownloadUrl(videoId);
 
       // Play through the main player so it shows in the player / mini-player /
       // notification and is fully controllable.
@@ -122,13 +129,37 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               onTimeout: () => null,
             ))?.large;
       final id = 'discover:$key';
-      await handler.playStream(
+      Future<void> play() => handler.playStream(
         id: id,
         url: mp3Url,
         title: track.name,
         artist: track.artist,
         artUri: art,
       );
+      try {
+        await play();
+      } on PlayerInterruptedException {
+        rethrow; // another song was started meanwhile
+      } on PlayerException {
+        // The audio server can fail for a moment, or one of its servers can
+        // be down: ask for a fresh link and try once more.
+        await Future<void>.delayed(const Duration(seconds: 1));
+        if (superseded()) return;
+        try {
+          mp3Url = await _discoveryService.getDownloadUrl(videoId);
+          if (superseded()) return;
+          await play();
+        } on PlayerInterruptedException {
+          rethrow;
+        } catch (_) {
+          if (superseded()) return;
+          // Don't leave the failed song showing as the one playing.
+          await handler.clearFailedStream(id);
+          final check = await _discoveryService.checkStreamUrl(mp3Url);
+          throw DiscoverException(check.message('play'));
+        }
+      }
+      if (superseded()) return;
       if (art == null) {
         // Still looking: give the playing song its cover when it arrives.
         unawaited(
@@ -140,10 +171,18 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       if (!mounted) return;
       setState(() => _loadingTrack = null);
       widget.onNavigateToPlayer();
+    } on PlayerInterruptedException {
+      // Another song was started before this one loaded.
+      if (mounted && _loadingTrack == key) setState(() => _loadingTrack = null);
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || superseded()) return;
       setState(() => _loadingTrack = null);
       _showSnack(_errorText(e, 'Error playing track'));
+    } finally {
+      // A newer play took over: drop this one's spinner only.
+      if (mounted && superseded() && _loadingTrack == key) {
+        setState(() => _loadingTrack = null);
+      }
     }
   }
 
@@ -193,7 +232,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         );
         break;
       case DownloadResult.failed:
-        _showSnack('Failed to download ${track.name}');
+        _showSnack(errorMessage ?? 'Failed to download ${track.name}');
         break;
       case DownloadResult.permissionDenied:
         _showSnack(
@@ -213,7 +252,12 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   void _showSnack(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        // Longer messages explain what to try: leave time to read them.
+        duration: Duration(seconds: message.length > 80 ? 8 : 4),
+      ),
     );
   }
 
