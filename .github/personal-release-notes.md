@@ -14,4 +14,4 @@ This build exists only to show Noir Player in **OnePlus / OPPO Live Alerts** (th
 - OnePlus can change its allowlist at any time, so the pill may stop appearing after a system update. OxygenOS 16 shows any music player as a Live Alert, so this build isn't needed there.
 - It doesn't receive in-place updates from the normal Noir Player releases.
 
-**This build:** Noir Player {version}. Downloaded songs keep their album cover, saved inside the file, so it shows in the Library, the player and on the lock screen, along with the proper song title and artist. It updates the previous Noir Player Live build in place — same package name and signing key.
+**This build:** Noir Player {version}. The progress bar in the notification, on the lock screen and in Live Alerts now works for Discover songs, and a Discover song that fails to load is retried once and explains why if it still fails. It updates the previous Noir Player Live build in place — same package name and signing key.
