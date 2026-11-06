@@ -1,5 +1,6 @@
 package com.example.noir_player
 
+import okhttp3.ConnectionPool
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.schabi.newpipe.extractor.downloader.Downloader
@@ -49,7 +50,11 @@ class NewPipeDownloader(val client: OkHttpClient) : Downloader() {
         fun create() = NewPipeDownloader(
             OkHttpClient.Builder()
                 .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(15, TimeUnit.SECONDS)
+                // Mobile networks drop idle connections without saying so; a
+                // request sent on one just hangs. Don't keep them around long.
+                .connectionPool(ConnectionPool(5, 30, TimeUnit.SECONDS))
+                .pingInterval(10, TimeUnit.SECONDS)
                 .build(),
         )
     }

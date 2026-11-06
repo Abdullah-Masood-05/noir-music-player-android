@@ -120,6 +120,8 @@ class YouTubeChannel(private val context: Context, messenger: BinaryMessenger) :
                     // "No matching video" and the like won't change.
                     if (e.message?.startsWith("No ") == true) throw e
                     Log.w(TAG, "Resolving failed, retrying", e)
+                    // On fresh connections, in case the old ones went dead.
+                    downloader.client.connectionPool.evictAll()
                     Thread.sleep(800)
                     resolve(query, videoId)
                 }
