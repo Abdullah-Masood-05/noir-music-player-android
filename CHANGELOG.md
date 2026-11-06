@@ -12,6 +12,7 @@ notes of the matching GitHub release.
 - A song that fails to load no longer stays in the mini player looking like it's playing.
 
 ### 🛠️ Fixes
+- **No more silent playback after another app.** If YouTube (or another app) paused your song and you pressed play again, the song could run with no sound until you skipped to the next one. Noir Player now asks Android for the audio again properly, so the sound comes back straight away.
 - Seeking while paused is remembered, so the app resumes from there next time.
 
 ## [2.0.3] - Downloads keep their album cover
