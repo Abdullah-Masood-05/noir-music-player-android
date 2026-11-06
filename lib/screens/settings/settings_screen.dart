@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/services/ytdlp.dart';
+import '../../core/services/youtube_native.dart';
 import '../../core/state/library.dart';
 import '../../core/state/settings.dart';
 import '../../core/state/sleep_timer.dart';
@@ -151,15 +151,15 @@ class SettingsScreen extends ConsumerWidget {
                 const Divider(height: 1),
 
                 _SectionHeader('Discover'),
-                if (YtDlp.available)
+                if (YouTubeNative.available)
                   const ListTile(
                     leading: Icon(Icons.phone_android_outlined),
                     title: Text('Songs come straight from YouTube'),
                     subtitle: Text(
-                      'yt-dlp runs on your phone to find, play and download '
-                      'songs, with no key or limit. The trending list and '
-                      "search come from Last.fm through Noir Player's server, "
-                      'or with your own key below.',
+                      'Your phone finds, plays and downloads songs on YouTube '
+                      'itself (with NewPipe Extractor), with no key or limit. '
+                      "The trending list and search come from Last.fm through "
+                      "Noir Player's server, or with your own key below.",
                     ),
                   )
                 else
@@ -182,8 +182,8 @@ class SettingsScreen extends ConsumerWidget {
                     save: notifier.setLastFmApiKey,
                   ),
                 ),
-                // yt-dlp replaces both of these on Android.
-                if (!YtDlp.available) ...[
+                // The phone reaches YouTube itself on Android, without these.
+                if (!YouTubeNative.available) ...[
                   ListTile(
                     leading: const Icon(Icons.key_outlined),
                     title: const Text('YouTube Data API key'),

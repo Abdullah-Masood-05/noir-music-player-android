@@ -3,13 +3,14 @@
 Release notes for Noir Player. Each `## [x.y.z] - Title` section becomes the
 notes of the matching GitHub release.
 
-## [2.0.4] - Discover runs on yt-dlp
+## [2.0.4] - Discover gets songs straight from YouTube
 
 ### ▶️ Discover
-- **Discover now uses yt-dlp on your phone (Android).** Finding, playing and downloading a song is done by yt-dlp running on the phone itself, asking YouTube directly. There's no API key, no shared limit and no server in between, so Discover can't run out of requests any more. yt-dlp keeps itself up to date (about once a day), so it keeps working when YouTube changes. The first Discover song after installing takes a little longer while it sets up.
-- **Downloads are still MP3**, with the album cover, title and artist saved in the file. On the rare phone where converting fails, the song is saved in its original `.m4a` format instead.
-- On Android, the YouTube and RapidAPI key settings are gone, since yt-dlp replaces both. The Last.fm key (for the trending list and search) is still there.
-- The Android app is larger, because it now includes yt-dlp, Python and FFmpeg.
+- **Discover now reaches YouTube from your phone (Android).** Finding, playing and downloading a song is done on the phone itself with NewPipe Extractor, the library behind the NewPipe app. There's no API key, no shared limit and no server in between, so Discover can't run out of requests any more.
+- **Better matches.** Songs are looked up on YouTube Music first, so you get the official audio rather than a music video with an intro.
+- **Downloads show real progress**, and are saved as M4A (YouTube's original audio quality, no re-encoding), with the album cover, title and artist inside the file.
+- **Deleted downloads lose their tick.** If you delete a song you downloaded from Discover, it no longer shows as downloaded, so you can download it again.
+- On Android, the YouTube and RapidAPI key settings are gone, since the phone reaches YouTube itself. The Last.fm key (for the trending list and search) is still there.
 - **The progress bar works for Discover songs.** In the notification, on the lock screen and in OnePlus Live Alerts it was greyed out, because the song's length got lost right after it loaded. It now stays, so you can see where you are and drag to seek.
 - **Fewer "Source error" failures.** If a song's audio doesn't load, Noir Player gets a fresh link and tries once more on its own.
 - **Clear error messages.** When a song still can't be played or downloaded, the message says why: the audio server couldn't be reached (often your network, Private DNS, an ad blocker or a VPN), it refused the request, the song isn't available right now, or the server is having trouble. A short detail at the end (like `server, HTTP 403`) helps when reporting it.

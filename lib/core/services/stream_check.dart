@@ -69,10 +69,14 @@ class StreamCheck {
 }
 
 /// Asks for the first bytes of [url] to find out why it failed. Never throws.
+///
+/// [request] replaces the default ranged GET, for links that must be asked
+/// for in a particular way (YouTube's).
 Future<StreamCheck> checkStream(
   http.Client client,
   String url, {
   Duration timeout = const Duration(seconds: 10),
+  http.BaseRequest? request,
 }) async {
   final uri = Uri.tryParse(url);
   final host = uri?.host ?? '';
@@ -81,8 +85,9 @@ Future<StreamCheck> checkStream(
   }
   final http.StreamedResponse response;
   try {
-    final request = http.Request('GET', uri)..headers['Range'] = 'bytes=0-1023';
-    final pending = client.send(request);
+    final pending = client.send(
+      request ?? (http.Request('GET', uri)..headers['Range'] = 'bytes=0-1023'),
+    );
     response = await pending.timeout(
       timeout,
       onTimeout: () {

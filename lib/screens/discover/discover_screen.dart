@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:just_audio/just_audio.dart' show PlayerException, PlayerInterruptedException;
+import 'package:just_audio/just_audio.dart'
+    show PlayerException, PlayerInterruptedException;
 
 import '../../core/models/discovered_track.dart';
 import '../../core/services/cover_lookup.dart';
 import '../../core/services/discover_api.dart';
+import '../../core/services/youtube_native.dart' show YouTubeStreamSource;
 import '../../core/services/music_discovery_service.dart';
 import '../../core/state/covers.dart';
 import '../../core/state/library.dart';
@@ -26,7 +28,8 @@ class DiscoverScreen extends ConsumerStatefulWidget {
   ConsumerState<DiscoverScreen> createState() => _DiscoverScreenState();
 }
 
-class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
+class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
+    with WidgetsBindingObserver {
   late final MusicDiscoveryService _discoveryService = ref.read(
     musicDiscoveryServiceProvider,
   );
@@ -47,6 +50,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _discoveryService.loadDownloadedKeys().then((_) {
       if (mounted) setState(() {});
     });
@@ -55,8 +59,22 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// A downloaded song may have been deleted while the app was away: recheck
+  /// so its tick goes.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _recheckDownloads();
+  }
+
+  Future<void> _recheckDownloads() async {
+    if (await _discoveryService.refreshDownloaded() && mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _loadTrending() async {
@@ -112,8 +130,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               .coverFor(track.artist, track.name, urgent: true)
         : Future<Cover?>.value(null);
     try {
-      final source = await _discoveryService.resolveStream(track);
-      var mp3Url = source.url;
+      var source = await _discoveryService.resolveStream(track);
 
       // Play through the main player so it shows in the player / mini-player /
       // notification and is fully controllable.
@@ -126,13 +143,24 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               onTimeout: () => null,
             ))?.large;
       final id = 'discover:$key';
-      Future<void> play() => handler.playStream(
-        id: id,
-        url: mp3Url,
-        title: track.name,
-        artist: track.artist,
-        artUri: art,
-      );
+      Future<void> play() {
+        final youtube = source.youtube;
+        return handler.playStream(
+          id: id,
+          url: source.url,
+          title: track.name,
+          artist: track.artist,
+          artUri: art,
+          source: youtube == null
+              ? null
+              : (item) => YouTubeStreamSource(
+                  youtube,
+                  _discoveryService.client,
+                  tag: item,
+                ),
+        );
+      }
+
       try {
         await play();
       } on PlayerInterruptedException {
@@ -143,10 +171,10 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         await Future<void>.delayed(const Duration(seconds: 1));
         if (superseded()) return;
         try {
-          mp3Url = (await _discoveryService.resolveStream(
+          source = await _discoveryService.resolveStream(
             track,
             videoId: source.videoId,
-          )).url;
+          );
           if (superseded()) return;
           await play();
         } on PlayerInterruptedException {
@@ -155,7 +183,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
           if (superseded()) return;
           // Don't leave the failed song showing as the one playing.
           await handler.clearFailedStream(id);
-          final check = await _discoveryService.checkStreamUrl(mp3Url);
+          final check = await _discoveryService.checkSource(source);
           throw DiscoverException(check.message('play'));
         }
       }
@@ -264,6 +292,8 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // The Library reloads after songs change: recheck the ticks then too.
+    ref.listen(librarySongsProvider, (_, _) => _recheckDownloads());
 
     return Scaffold(
       backgroundColor: Colors.transparent,
