@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -14,7 +15,7 @@ import '../state/settings.dart';
 import 'discover_api.dart';
 import 'id3_tagger.dart';
 import 'stream_check.dart';
-import 'ytdlp.dart';
+import 'youtube_native.dart';
 
 /// Outcome of a download attempt.
 enum DownloadResult {
@@ -52,15 +53,19 @@ class MusicDiscoveryService {
     required String? Function() musicFolder,
     required OnAudioQuery audioQuery,
     required http.Client client,
-    YtDlp? ytdlp,
+    YouTubeNative? youtube,
   }) : _api = DiscoverApi(keys: keys, client: client),
        _musicFolder = musicFolder,
        _audioQuery = audioQuery,
        _client = client,
-       _ytdlp = ytdlp ?? YtDlp();
+       _youtube = youtube ?? YouTubeNative();
 
-  /// yt-dlp on the phone: finds, plays and downloads songs on Android.
-  final YtDlp _ytdlp;
+  /// YouTube on the phone (NewPipe Extractor): finds, plays and downloads
+  /// songs on Android.
+  final YouTubeNative _youtube;
+
+  /// The HTTP client, also used to stream YouTube audio while it plays.
+  http.Client get client => _client;
 
   /// Discover's requests.
   final DiscoverApi _api;
@@ -74,10 +79,15 @@ class MusicDiscoveryService {
   /// appear in the Library/Music tab (and other apps) immediately.
   final OnAudioQuery _audioQuery;
 
-  static const String _downloadedPrefsKey = 'downloaded_track_keys';
+  /// Downloaded tracks as {track key: saved file path}, as JSON.
+  static const String _downloadedPrefsKey = 'downloaded_tracks';
 
-  /// Keys of tracks already downloaded (kept in sync with SharedPreferences).
-  final Set<String> _downloadedKeys = {};
+  /// Older builds kept only the keys, without the file.
+  static const String _legacyDownloadedPrefsKey = 'downloaded_track_keys';
+
+  /// Tracks already downloaded and where they were saved (kept in sync with
+  /// SharedPreferences). A track whose file is gone counts as not downloaded.
+  final Map<String, String> _downloaded = {};
   bool _downloadedLoaded = false;
 
   /// Keys of downloads currently running, to avoid concurrent duplicates.
@@ -108,6 +118,17 @@ class MusicDiscoveryService {
   /// Why the audio link [url] can't be played or downloaded.
   Future<StreamCheck> checkStreamUrl(String url) => checkStream(_client, url);
 
+  /// Why [source] can't be played, asked the same way it's played.
+  Future<StreamCheck> checkSource(ResolvedStream source) {
+    final yt = source.youtube;
+    if (yt == null) return checkStreamUrl(source.url);
+    return checkStream(
+      _client,
+      source.url,
+      request: youTubeStreamRequest(yt, 0, 1023, 0),
+    );
+  }
+
   /// A downloadable audio link for [videoId].
   Future<String> getDownloadUrl(String videoId) =>
       _api.resolveAudioLink(videoId);
@@ -115,58 +136,119 @@ class MusicDiscoveryService {
   /// The audio stream to play [track] from, and its YouTube video. With
   /// [videoId] (a retry) that video is used again instead of searching.
   ///
-  /// On Android yt-dlp finds and resolves it on the phone; elsewhere the
-  /// backend does.
-  Future<({String videoId, String url})> resolveStream(
+  /// On Android NewPipe Extractor finds and resolves it on the phone (and
+  /// [ResolvedStream.youtube] says how to fetch it); elsewhere the backend
+  /// does.
+  Future<ResolvedStream> resolveStream(
     DiscoveredTrack track, {
     String? videoId,
   }) async {
-    if (YtDlp.available) {
-      final audio = await _ytdlp.resolve(
-        videoId != null
-            ? YtDlp.videoTarget(videoId)
-            : YtDlp.searchTarget(track.name, track.artist),
+    if (YouTubeNative.available) {
+      final audio = await _youtube.resolve(
+        query: videoId == null
+            ? YouTubeNative.searchQuery(track.name, track.artist)
+            : null,
+        videoId: videoId,
       );
-      return (videoId: audio.videoId, url: audio.url);
+      return ResolvedStream(
+        videoId: audio.videoId,
+        url: audio.url,
+        youtube: audio,
+      );
     }
     final id = videoId ?? await fetchYoutubeVideoId(track.name, track.artist);
-    return (videoId: id, url: await getDownloadUrl(id));
+    return ResolvedStream(videoId: id, url: await getDownloadUrl(id));
   }
 
   // ---------------------------------------------------------------------------
   // Download bookkeeping (de-duplication)
   // ---------------------------------------------------------------------------
 
-  /// Load the set of already-downloaded track keys from storage (once).
+  /// Loads the downloaded tracks from storage (once), then forgets any whose
+  /// file has been deleted or moved since. Safe to call again to recheck.
   Future<Set<String>> loadDownloadedKeys() async {
-    if (_downloadedLoaded) return _downloadedKeys;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      _downloadedKeys
-        ..clear()
-        ..addAll(prefs.getStringList(_downloadedPrefsKey) ?? const []);
-    } catch (e) {
-      _logError('Error loading downloaded keys: $e');
+    if (!_downloadedLoaded) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        _downloaded
+          ..clear()
+          ..addAll(decodeDownloaded(prefs.getString(_downloadedPrefsKey)));
+        final legacy = prefs.getStringList(_legacyDownloadedPrefsKey);
+        if (legacy != null) {
+          await _migrateLegacy(legacy);
+          await prefs.remove(_legacyDownloadedPrefsKey);
+          await _saveDownloaded();
+        }
+      } catch (e) {
+        _logError('Error loading downloaded tracks: $e');
+      }
+      _downloadedLoaded = true;
     }
-    _downloadedLoaded = true;
-    return _downloadedKeys;
+    await refreshDownloaded();
+    return _downloaded.keys.toSet();
   }
 
-  bool isDownloaded(String key) => _downloadedKeys.contains(key);
+  /// Forgets downloads whose file is gone. Returns whether any were.
+  Future<bool> refreshDownloaded() async {
+    final gone = <String>[];
+    for (final entry in _downloaded.entries) {
+      if (!await File(entry.value).exists()) gone.add(entry.key);
+    }
+    if (gone.isEmpty) return false;
+    gone.forEach(_downloaded.remove);
+    await _saveDownloaded();
+    return true;
+  }
+
+  /// Older builds stored "name-artist" keys without the file. Each key is
+  /// matched to the file a download of it would have been saved as (the song
+  /// name is the part before one of the "-"s); keys without one are dropped.
+  Future<void> _migrateLegacy(List<String> keys) async {
+    final String folder;
+    try {
+      folder = await downloadDirectory();
+    } catch (_) {
+      return;
+    }
+    for (final key in keys) {
+      if (_downloaded.containsKey(key)) continue;
+      for (var i = key.indexOf('-'); i > 0; i = key.indexOf('-', i + 1)) {
+        final base = _sanitizeFileName(key.substring(0, i));
+        final path = ['mp3', 'm4a']
+            .map((ext) => '$folder/$base.$ext')
+            .where((p) => File(p).existsSync())
+            .firstOrNull;
+        if (path != null) {
+          _downloaded[key] = path;
+          break;
+        }
+      }
+    }
+  }
+
+  /// Whether the track was downloaded and its file is still there.
+  bool isDownloaded(String key) {
+    final path = _downloaded[key];
+    if (path == null) return false;
+    if (File(path).existsSync()) return true;
+    _downloaded.remove(key);
+    unawaited(_saveDownloaded());
+    return false;
+  }
 
   bool isDownloading(String key) => _inProgressKeys.contains(key);
 
-  Future<void> _markDownloaded(String key) async {
-    if (_downloadedKeys.add(key)) {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setStringList(
-          _downloadedPrefsKey,
-          _downloadedKeys.toList(),
-        );
-      } catch (e) {
-        _logError('Error persisting downloaded key: $e');
-      }
+  Future<void> _markDownloaded(String key, String path) async {
+    _downloaded[key] = path;
+    await _saveDownloaded();
+  }
+
+  Future<void> _saveDownloaded() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_downloadedPrefsKey, jsonEncode(_downloaded));
+    } catch (e) {
+      _logError('Error saving downloaded tracks: $e');
     }
   }
 
@@ -198,8 +280,8 @@ class MusicDiscoveryService {
         return DownloadResult.permissionDenied;
       }
 
-      if (YtDlp.available) {
-        return await _downloadWithYtDlp(
+      if (YouTubeNative.available) {
+        return await _downloadWithYouTube(
           track,
           key,
           coverUrl: coverUrl,
@@ -231,7 +313,7 @@ class MusicDiscoveryService {
         return DownloadResult.failed;
       }
 
-      await _markDownloaded(key);
+      await _markDownloaded(key, savedUri);
       return DownloadResult.success;
     } catch (e) {
       _logError('Error downloading ${track.name}: $e');
@@ -241,37 +323,73 @@ class MusicDiscoveryService {
     }
   }
 
-  /// Android: yt-dlp saves the audio (converted to MP3 when it can) in the
-  /// app's cache, then it's moved into the music folder and tagged.
-  Future<DownloadResult> _downloadWithYtDlp(
+  /// Android: the audio is fetched from YouTube on the phone into the app's
+  /// cache (with real progress), rebuilt as a normal M4A with the title,
+  /// artist and cover inside, then moved into the music folder.
+  Future<DownloadResult> _downloadWithYouTube(
     DiscoveredTrack track,
     String key, {
     Future<String?>? coverUrl,
     void Function(int received, int total)? onProgress,
     void Function(String message)? onError,
   }) async {
-    final File temp;
+    final YouTubeAudio audio;
     try {
-      final cache = await getTemporaryDirectory();
-      temp = await _ytdlp.download(
-        YtDlp.searchTarget(track.name, track.artist),
-        dir: '${cache.path}/ytdlp',
-        id: 'dl${DateTime.now().microsecondsSinceEpoch}',
-        // Reported as tenths of a percent, so the bar moves smoothly.
-        onProgress: (percent) => onProgress?.call((percent * 10).round(), 1000),
+      audio = await _youtube.resolve(
+        query: YouTubeNative.searchQuery(track.name, track.artist),
       );
     } on DiscoverException catch (e) {
       onError?.call(e.message);
       return DownloadResult.noSource;
     }
-    final saved = await saveLocalFile(
-      temp,
-      track.name,
-      tag: (file) => _tag(file, track, coverUrl),
-    );
-    if (saved == null) return DownloadResult.failed;
-    await _markDownloaded(key);
-    return DownloadResult.success;
+    // Look the cover up while the audio downloads.
+    final cover = _coverBytes(track, coverUrl);
+    final dir = '${(await getTemporaryDirectory()).path}/youtube';
+    final id = 'dl${DateTime.now().microsecondsSinceEpoch}';
+    final raw = '$dir/$id.part';
+    final rebuilt = '$dir/$id.m4a';
+    final plain = '$dir/$id.${audio.ext}';
+    try {
+      final File downloaded;
+      try {
+        downloaded = await _youtube.download(
+          audio,
+          path: raw,
+          id: id,
+          onProgress: onProgress,
+        );
+      } on DiscoverException catch (e) {
+        onError?.call(e.message);
+        return DownloadResult.failed;
+      }
+      File? finished;
+      if (audio.ext == 'm4a') {
+        try {
+          finished = await _youtube.finish(
+            downloaded,
+            rebuilt,
+            title: track.name,
+            artist: track.artist,
+            cover: await cover,
+          );
+        } catch (e) {
+          // Keep the song even if it can't be rebuilt: it still plays.
+          _logError('Finishing ${track.name} failed: $e');
+        }
+      }
+      final source = finished ?? await downloaded.rename(plain);
+      final saved = await saveLocalFile(source, track.name);
+      if (saved == null) return DownloadResult.failed;
+      await _markDownloaded(key, saved);
+      return DownloadResult.success;
+    } finally {
+      for (final path in {raw, rebuilt, plain}) {
+        try {
+          final f = File(path);
+          if (await f.exists()) await f.delete();
+        } catch (_) {}
+      }
+    }
   }
 
   /// Ensure we can write into the public Music folder.
@@ -339,9 +457,9 @@ class MusicDiscoveryService {
     }
   }
 
-  /// Moves an already-downloaded [source] (from yt-dlp) into the music
-  /// folder, tags it when it's an MP3 and registers it with the media
-  /// library. Returns the saved file path, or null on failure.
+  /// Moves an already-downloaded [source] into the music folder, tags it when
+  /// it's an MP3 and registers it with the media library. Returns the saved
+  /// file path, or null on failure.
   Future<String?> saveLocalFile(
     File source,
     String rawFilename, {
@@ -349,7 +467,9 @@ class MusicDiscoveryService {
   }) async {
     try {
       final dot = source.path.lastIndexOf('.');
-      final ext = dot > 0 ? source.path.substring(dot + 1).toLowerCase() : 'm4a';
+      final ext = dot > 0
+          ? source.path.substring(dot + 1).toLowerCase()
+          : 'm4a';
       final filePath = await _newFilePath(rawFilename, ext);
       // Copy, not rename: the cache and the music folder can be on
       // different storage.
@@ -357,7 +477,7 @@ class MusicDiscoveryService {
       try {
         await source.delete();
       } catch (_) {}
-      // Only MP3 tags are written; other formats keep yt-dlp's.
+      // Only MP3 tags are written here; M4As are tagged when rebuilt.
       if (tag != null && ext == 'mp3') await tag(File(filePath));
       await _register(filePath);
       return filePath;
@@ -445,20 +565,32 @@ class MusicDiscoveryService {
     Future<String?>? coverUrl,
   ) async {
     try {
+      await Id3Tagger.write(
+        file,
+        title: track.name,
+        artist: track.artist,
+        cover: await _coverBytes(track, coverUrl),
+      );
+    } catch (e) {
+      _logError('Tagging failed for ${file.path}: $e');
+    }
+  }
+
+  /// [track]'s album cover as a picture, or null when there's none.
+  Future<Uint8List?> _coverBytes(
+    DiscoveredTrack track,
+    Future<String?>? coverUrl,
+  ) async {
+    try {
       final url = track.imageUrl.isNotEmpty
           ? track.imageUrl
           : await coverUrl?.timeout(
               const Duration(seconds: 15),
               onTimeout: () => null,
             );
-      await Id3Tagger.write(
-        file,
-        title: track.name,
-        artist: track.artist,
-        cover: url == null ? null : await _fetchCover(url),
-      );
-    } catch (e) {
-      _logError('Tagging failed for ${file.path}: $e');
+      return url == null ? null : await _fetchCover(url);
+    } catch (_) {
+      return null;
     }
   }
 
@@ -502,5 +634,36 @@ class MusicDiscoveryService {
 
   void _logError(String message) {
     if (kDebugMode) debugPrint(message);
+  }
+}
+
+/// Where to play a Discover song from. [youtube] is set when the phone found
+/// it on YouTube itself, and says how the link must be fetched.
+class ResolvedStream {
+  const ResolvedStream({
+    required this.videoId,
+    required this.url,
+    this.youtube,
+  });
+
+  final String videoId;
+  final String url;
+  final YouTubeAudio? youtube;
+}
+
+/// Reads the stored {track key: file path} map.
+@visibleForTesting
+Map<String, String> decodeDownloaded(String? json) {
+  if (json == null || json.isEmpty) return {};
+  try {
+    final root = jsonDecode(json);
+    if (root is! Map) return {};
+    return {
+      for (final e in root.entries)
+        if (e.key is String && e.value is String && e.value != '')
+          e.key as String: e.value as String,
+    };
+  } on FormatException {
+    return {};
   }
 }

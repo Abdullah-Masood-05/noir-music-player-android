@@ -1,14 +1,33 @@
-# youtubedl-android (yt-dlp on the phone). Its own ProGuard rules apply only
-# when the library itself is built, not to apps using it, so they're repeated
-# here.
-#
-# commons-compress unpacks Python, yt-dlp and FFmpeg on first launch. Its zip
-# reader registers its "extra field" classes by name, which breaks once R8
-# renames them (the Discover error "J2.f" was ExtraFieldUtils failing to load).
--keep class com.yausername.** { *; }
--keep class org.apache.commons.compress.** { *; }
--keep class org.apache.commons.io.** { *; }
--keep class com.fasterxml.jackson.** { *; }
--dontwarn org.apache.commons.compress.**
--dontwarn org.apache.commons.io.**
--dontwarn com.fasterxml.jackson.**
+# NewPipe Extractor (Discover's YouTube access). These rules come from the
+# NewPipe app's own proguard-rules.pro: classes it and Rhino (the JavaScript
+# engine it runs YouTube's player code in) load by name.
+
+## NewPipe Extractor
+-keep class org.schabi.newpipe.extractor.timeago.patterns.** { *; }
+-keepclassmembers class * extends com.google.protobuf.GeneratedMessageLite {
+    <fields>;
+}
+
+## Rhino and Rhino Engine
+-keep class org.mozilla.javascript.* { *; }
+-keep class org.mozilla.javascript.** { *; }
+-keep class org.mozilla.javascript.engine.** { *; }
+-keep class org.mozilla.classfile.ClassFileWriter
+-dontwarn org.mozilla.javascript.JavaToJSONConverters
+-dontwarn org.mozilla.javascript.tools.**
+-keep class javax.script.** { *; }
+-dontwarn javax.script.**
+-keep class jdk.dynalink.** { *; }
+-dontwarn jdk.dynalink.**
+
+## OkHttp
+-dontwarn okhttp3.**
+-dontwarn okio.**
+
+## Serializable classes (NewPipe #1441)
+-keepclassmembers class * implements java.io.Serializable {
+    static final long serialVersionUID;
+    !static !transient <fields>;
+    private void writeObject(java.io.ObjectOutputStream);
+    private void readObject(java.io.ObjectInputStream);
+}

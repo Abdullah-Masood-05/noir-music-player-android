@@ -413,12 +413,16 @@ class AudioPlayerHandler extends BaseAudioHandler {
   /// Play a remote stream (e.g. a Discover track) through the main player, so it
   /// appears in the player, mini-player and notification and is fully
   /// controllable.
+  ///
+  /// [source] builds the audio source for links that need more than a plain
+  /// GET (YouTube's, fetched the way NewPipe does).
   Future<void> playStream({
     required String id,
     required String url,
     required String title,
     required String artist,
     String? artUri,
+    AudioSource Function(MediaItem item)? source,
   }) async {
     final item = MediaItem(
       id: id,
@@ -434,7 +438,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
     queue.add([item]);
     mediaItem.add(item);
     await _player.setAudioSources(
-      [AudioSource.uri(Uri.parse(url), tag: item)],
+      [source?.call(item) ?? AudioSource.uri(Uri.parse(url), tag: item)],
       initialIndex: 0,
       initialPosition: Duration.zero,
     );

@@ -27,6 +27,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        // NewPipe Extractor uses newer Java APIs (java.time, java.nio).
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -38,8 +40,7 @@ android {
         applicationId = "com.example.noir_player"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        // youtubedl-android (yt-dlp for Discover) needs Android 7.0+.
-        minSdk = maxOf(flutter.minSdkVersion, 24)
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -58,7 +59,7 @@ android {
 
     buildTypes {
         release {
-            // Keep yt-dlp's helper classes through code shrinking.
+            // Keep the classes NewPipe Extractor and Rhino load by name.
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -72,27 +73,17 @@ android {
             }
         }
     }
-
-    // youtubedl-android unpacks Python, yt-dlp and FFmpeg from its native
-    // libraries at run time, so they must stay extracted on install.
-    packaging {
-        jniLibs {
-            useLegacyPackaging = true
-            // These are zip archives named .so, not code: don't strip them.
-            keepDebugSymbols += "**/libpython.zip.so"
-            keepDebugSymbols += "**/libffmpeg.zip.so"
-        }
-    }
 }
 
 flutter {
     source = "../.."
 }
 
-// yt-dlp on the phone for Discover: https://github.com/yausername/youtubedl-android
-val youtubedlAndroid = "0.18.1"
-
+// Discover reaches YouTube on the phone through NewPipe Extractor, the
+// library behind the NewPipe app: https://github.com/TeamNewPipe/NewPipeExtractor
+// Same version as NewPipe 0.29.1 uses.
 dependencies {
-    implementation("io.github.junkfood02.youtubedl-android:library:$youtubedlAndroid")
-    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:$youtubedlAndroid")
+    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
 }
