@@ -98,10 +98,28 @@ class YtDlpChannel(private val context: Context, messenger: BinaryMessenger) :
                 val value = work()
                 main.post { result.success(value) }
             } catch (e: Throwable) {
-                val message = e.message ?: e.toString()
+                val message = describe(e)
+                android.util.Log.e("NoirYtDlp", message, e)
                 main.post { result.error("ytdlp", message, null) }
             }
         }
+    }
+
+    /**
+     * yt-dlp's own error text when there is one; otherwise the error's type
+     * and causes (an empty message would only show a class name).
+     */
+    private fun describe(e: Throwable): String {
+        val own = e.message?.trim()
+        if (!own.isNullOrEmpty() && own != e.javaClass.name) return own
+        val parts = mutableListOf<String>()
+        var t: Throwable? = e
+        while (t != null && parts.size < 4) {
+            val msg = t.message?.trim()
+            parts += if (msg.isNullOrEmpty()) t.javaClass.simpleName else "${t.javaClass.simpleName}: $msg"
+            t = t.cause.takeIf { it !== t }
+        }
+        return parts.joinToString(" <- ")
     }
 
     private fun ensureInit() {
