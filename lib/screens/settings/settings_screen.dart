@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/services/ytdlp.dart';
 import '../../core/state/library.dart';
 import '../../core/state/settings.dart';
 import '../../core/state/sleep_timer.dart';
@@ -150,14 +151,26 @@ class SettingsScreen extends ConsumerWidget {
                 const Divider(height: 1),
 
                 _SectionHeader('Discover'),
-                const ListTile(
-                  leading: Icon(Icons.cloud_outlined),
-                  title: Text("Runs through Noir Player's server"),
-                  subtitle: Text(
-                    'Optionally add your own keys below. A service with a key '
-                    'is called directly with it.',
+                if (YtDlp.available)
+                  const ListTile(
+                    leading: Icon(Icons.phone_android_outlined),
+                    title: Text('Songs come straight from YouTube'),
+                    subtitle: Text(
+                      'yt-dlp runs on your phone to find, play and download '
+                      'songs, with no key or limit. The trending list and '
+                      "search come from Last.fm through Noir Player's server, "
+                      'or with your own key below.',
+                    ),
+                  )
+                else
+                  const ListTile(
+                    leading: Icon(Icons.cloud_outlined),
+                    title: Text("Runs through Noir Player's server"),
+                    subtitle: Text(
+                      'Optionally add your own keys below. A service with a '
+                      'key is called directly with it.',
+                    ),
                   ),
-                ),
                 ListTile(
                   leading: const Icon(Icons.key_outlined),
                   title: const Text('Last.fm API key'),
@@ -169,28 +182,31 @@ class SettingsScreen extends ConsumerWidget {
                     save: notifier.setLastFmApiKey,
                   ),
                 ),
-                ListTile(
-                  leading: const Icon(Icons.key_outlined),
-                  title: const Text('YouTube Data API key'),
-                  subtitle: Text(_keyStatus(settings.youtubeApiKey)),
-                  onTap: () => _editApiKey(
-                    context,
-                    title: 'YouTube Data API key',
-                    current: settings.youtubeApiKey,
-                    save: notifier.setYoutubeApiKey,
+                // yt-dlp replaces both of these on Android.
+                if (!YtDlp.available) ...[
+                  ListTile(
+                    leading: const Icon(Icons.key_outlined),
+                    title: const Text('YouTube Data API key'),
+                    subtitle: Text(_keyStatus(settings.youtubeApiKey)),
+                    onTap: () => _editApiKey(
+                      context,
+                      title: 'YouTube Data API key',
+                      current: settings.youtubeApiKey,
+                      save: notifier.setYoutubeApiKey,
+                    ),
                   ),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.key_outlined),
-                  title: const Text('RapidAPI key'),
-                  subtitle: Text(_keyStatus(settings.rapidApiKey)),
-                  onTap: () => _editApiKey(
-                    context,
-                    title: 'RapidAPI key',
-                    current: settings.rapidApiKey,
-                    save: notifier.setRapidApiKey,
+                  ListTile(
+                    leading: const Icon(Icons.key_outlined),
+                    title: const Text('RapidAPI key'),
+                    subtitle: Text(_keyStatus(settings.rapidApiKey)),
+                    onTap: () => _editApiKey(
+                      context,
+                      title: 'RapidAPI key',
+                      current: settings.rapidApiKey,
+                      save: notifier.setRapidApiKey,
+                    ),
                   ),
-                ),
+                ],
               ],
             );
           },

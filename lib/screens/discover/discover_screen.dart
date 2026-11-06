@@ -112,11 +112,8 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               .coverFor(track.artist, track.name, urgent: true)
         : Future<Cover?>.value(null);
     try {
-      final videoId = await _discoveryService.fetchYoutubeVideoId(
-        track.name,
-        track.artist,
-      );
-      var mp3Url = await _discoveryService.getDownloadUrl(videoId);
+      final source = await _discoveryService.resolveStream(track);
+      var mp3Url = source.url;
 
       // Play through the main player so it shows in the player / mini-player /
       // notification and is fully controllable.
@@ -146,7 +143,10 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         await Future<void>.delayed(const Duration(seconds: 1));
         if (superseded()) return;
         try {
-          mp3Url = await _discoveryService.getDownloadUrl(videoId);
+          mp3Url = (await _discoveryService.resolveStream(
+            track,
+            videoId: source.videoId,
+          )).url;
           if (superseded()) return;
           await play();
         } on PlayerInterruptedException {
