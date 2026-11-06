@@ -187,40 +187,70 @@ class YouTubeStreamSource extends StreamAudioSource {
     return _length = total;
   }
 
+  /// Bytes [from] to [to] (exclusive), one chunk per request. A chunk that
+  /// fails part-way (a dropped connection) is asked for again from where it
+  /// stopped, twice at most; a refusal (HTTP 4xx) ends the stream at once.
   Stream<List<int>> _bytes(int from, int to) async* {
     var position = from;
+    var failures = 0;
     while (position < to) {
       final last = math.min(position + _chunk, to) - 1;
-      final response = await _client.send(
-        youTubeStreamRequest(audio, position, last, _requestNumber++),
-      );
-      if (response.statusCode != 206 && response.statusCode != 200) {
-        await response.stream.drain<void>();
-        throw HttpException('HTTP ${response.statusCode} from YouTube');
-      }
       final before = position;
-      var skip = response.statusCode == 200 ? position : 0;
-      await for (final chunk in response.stream) {
-        if (skip >= chunk.length) {
-          skip -= chunk.length;
-          continue;
+      Object? error;
+      try {
+        final response = await _client.send(
+          youTubeStreamRequest(audio, position, last, _requestNumber++),
+        );
+        final status = response.statusCode;
+        if (status != 206 && status != 200) {
+          await response.stream.drain<void>();
+          throw _Refused('HTTP $status from YouTube', retry: status >= 500);
         }
-        final part = skip > 0 ? chunk.sublist(skip) : chunk;
-        skip = 0;
-        final room = to - position;
-        if (part.length >= room) {
-          yield part.sublist(0, room);
-          position = to;
-          break;
+        // A whole-file answer starts at byte 0: skip to the position.
+        var skip = status == 200 ? position : 0;
+        await for (final chunk in response.stream) {
+          if (skip >= chunk.length) {
+            skip -= chunk.length;
+            continue;
+          }
+          final part = skip > 0 ? chunk.sublist(skip) : chunk;
+          skip = 0;
+          final room = last + 1 - position;
+          if (part.length >= room) {
+            yield part.sublist(0, room);
+            position = last + 1;
+            break;
+          }
+          yield part;
+          position += part.length;
         }
-        yield part;
-        position += part.length;
+        if (position <= last)
+          throw const _Refused('YouTube stopped sending audio');
+      } on _Refused catch (e) {
+        if (!e.retry) rethrow;
+        error = e;
+      } catch (e) {
+        error = e;
       }
-      if (position == before) {
-        throw HttpException('YouTube stopped sending audio');
+      if (error == null) {
+        failures = 0;
+        continue;
       }
+      if (position == before) failures++;
+      if (failures > 2) throw error;
+      await Future<void>.delayed(Duration(milliseconds: 400 * (failures + 1)));
     }
   }
+}
+
+class _Refused implements Exception {
+  const _Refused(this.message, {this.retry = true});
+
+  final String message;
+  final bool retry;
+
+  @override
+  String toString() => message;
 }
 
 /// One ranged request for a YouTube stream link (bytes [start] to [end],

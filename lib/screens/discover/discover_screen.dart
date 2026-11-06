@@ -11,6 +11,7 @@ import '../../core/services/cover_lookup.dart';
 import '../../core/services/discover_api.dart';
 import '../../core/services/youtube_native.dart' show YouTubeStreamSource;
 import '../../core/services/music_discovery_service.dart';
+import '../../core/services/stream_check.dart' show StreamProblem;
 import '../../core/state/covers.dart';
 import '../../core/state/library.dart';
 import '../../core/state/playback.dart';
@@ -179,12 +180,18 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
           await play();
         } on PlayerInterruptedException {
           rethrow;
-        } catch (_) {
+        } catch (e) {
           if (superseded()) return;
           // Don't leave the failed song showing as the one playing.
           await handler.clearFailedStream(id);
           final check = await _discoveryService.checkSource(source);
-          throw DiscoverException(check.message('play'));
+          // The link works: then the player's own reason is the useful part.
+          final why = e is PlayerException ? e.message : null;
+          throw DiscoverException(
+            check.problem == StreamProblem.none && why != null && why.isNotEmpty
+                ? "Couldn't play this song on this phone. ($why)"
+                : check.message('play'),
+          );
         }
       }
       if (superseded()) return;

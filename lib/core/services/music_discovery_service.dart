@@ -67,6 +67,35 @@ class MusicDiscoveryService {
   /// The HTTP client, also used to stream YouTube audio while it plays.
   http.Client get client => _client;
 
+  /// Songs found on YouTube recently, by track key, so playing and then
+  /// downloading a song (or playing it again) skips the search. YouTube's
+  /// links last about six hours; they're reused for [_resolvedFor].
+  final Map<String, ({YouTubeAudio audio, DateTime at})> _resolved = {};
+  static const Duration _resolvedFor = Duration(minutes: 30);
+
+  /// [track]'s YouTube audio: a recent lookup, or a new one. With
+  /// [videoId] (a retry) that video is resolved again, fresh.
+  Future<YouTubeAudio> _youtubeAudio(
+    DiscoveredTrack track, {
+    String? videoId,
+  }) async {
+    final key = trackKey(track);
+    final cached = _resolved[key];
+    if (videoId == null &&
+        cached != null &&
+        DateTime.now().difference(cached.at) < _resolvedFor) {
+      return cached.audio;
+    }
+    final audio = await _youtube.resolve(
+      query: videoId == null
+          ? YouTubeNative.searchQuery(track.name, track.artist)
+          : null,
+      videoId: videoId,
+    );
+    _resolved[key] = (audio: audio, at: DateTime.now());
+    return audio;
+  }
+
   /// Discover's requests.
   final DiscoverApi _api;
 
@@ -144,12 +173,7 @@ class MusicDiscoveryService {
     String? videoId,
   }) async {
     if (YouTubeNative.available) {
-      final audio = await _youtube.resolve(
-        query: videoId == null
-            ? YouTubeNative.searchQuery(track.name, track.artist)
-            : null,
-        videoId: videoId,
-      );
+      final audio = await _youtubeAudio(track, videoId: videoId);
       return ResolvedStream(
         videoId: audio.videoId,
         url: audio.url,
@@ -335,9 +359,7 @@ class MusicDiscoveryService {
   }) async {
     final YouTubeAudio audio;
     try {
-      audio = await _youtube.resolve(
-        query: YouTubeNative.searchQuery(track.name, track.artist),
-      );
+      audio = await _youtubeAudio(track);
     } on DiscoverException catch (e) {
       onError?.call(e.message);
       return DownloadResult.noSource;
@@ -359,6 +381,7 @@ class MusicDiscoveryService {
           onProgress: onProgress,
         );
       } on DiscoverException catch (e) {
+        _resolved.remove(key);
         onError?.call(e.message);
         return DownloadResult.failed;
       }

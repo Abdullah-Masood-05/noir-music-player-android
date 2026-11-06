@@ -231,6 +231,32 @@ void main() {
     });
   });
 
+  test('a server error is retried, a refusal is not', () async {
+    final data = _data(3000);
+    var calls = 0;
+    final flaky = MockClient((request) async {
+      if (calls++ == 0) return http.Response('busy', 503);
+      final m = RegExp(
+        r'bytes=(\d+)-(\d+)',
+      ).firstMatch(request.headers['Range']!)!;
+      final start = int.parse(m.group(1)!);
+      final end = int.parse(m.group(2)!).clamp(0, data.length - 1);
+      return http.Response.bytes(data.sublist(start, end + 1), 206);
+    });
+    final r = await YouTubeStreamSource(_audio(length: 3000), flaky).request();
+    expect(await _read(r.stream), data);
+    expect(calls, 2);
+
+    var refused = 0;
+    final no = MockClient((_) async {
+      refused++;
+      return http.Response('no', 403);
+    });
+    final r2 = await YouTubeStreamSource(_audio(length: 3000), no).request();
+    await expectLater(_read(r2.stream), throwsA(anything));
+    expect(refused, 1);
+  });
+
   group('decodeDownloaded', () {
     test('reads the stored map', () {
       expect(
