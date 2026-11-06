@@ -38,7 +38,8 @@ android {
         applicationId = "com.blueocean.huoledj"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // youtubedl-android (yt-dlp for Discover) needs Android 7.0+.
+        minSdk = maxOf(flutter.minSdkVersion, 24)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -57,6 +58,11 @@ android {
 
     buildTypes {
         release {
+            // Keep yt-dlp's helper classes through code shrinking.
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             // Use the release keystore when key.properties is present; otherwise
             // sign with the debug key so `flutter run --release` still works.
             signingConfig = if (hasReleaseKeystore) {
@@ -66,8 +72,27 @@ android {
             }
         }
     }
+
+    // youtubedl-android unpacks Python, yt-dlp and FFmpeg from its native
+    // libraries at run time, so they must stay extracted on install.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+            // These are zip archives named .so, not code: don't strip them.
+            keepDebugSymbols += "**/libpython.zip.so"
+            keepDebugSymbols += "**/libffmpeg.zip.so"
+        }
+    }
 }
 
 flutter {
     source = "../.."
+}
+
+// yt-dlp on the phone for Discover: https://github.com/yausername/youtubedl-android
+val youtubedlAndroid = "0.18.1"
+
+dependencies {
+    implementation("io.github.junkfood02.youtubedl-android:library:$youtubedlAndroid")
+    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:$youtubedlAndroid")
 }

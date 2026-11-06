@@ -14,6 +14,7 @@ import '../state/settings.dart';
 import 'discover_api.dart';
 import 'id3_tagger.dart';
 import 'stream_check.dart';
+import 'ytdlp.dart';
 
 /// Outcome of a download attempt.
 enum DownloadResult {
@@ -51,10 +52,15 @@ class MusicDiscoveryService {
     required String? Function() musicFolder,
     required OnAudioQuery audioQuery,
     required http.Client client,
+    YtDlp? ytdlp,
   }) : _api = DiscoverApi(keys: keys, client: client),
        _musicFolder = musicFolder,
        _audioQuery = audioQuery,
-       _client = client;
+       _client = client,
+       _ytdlp = ytdlp ?? YtDlp();
+
+  /// yt-dlp on the phone: finds, plays and downloads songs on Android.
+  final YtDlp _ytdlp;
 
   /// Discover's requests.
   final DiscoverApi _api;
@@ -105,6 +111,27 @@ class MusicDiscoveryService {
   /// A downloadable audio link for [videoId].
   Future<String> getDownloadUrl(String videoId) =>
       _api.resolveAudioLink(videoId);
+
+  /// The audio stream to play [track] from, and its YouTube video. With
+  /// [videoId] (a retry) that video is used again instead of searching.
+  ///
+  /// On Android yt-dlp finds and resolves it on the phone; elsewhere the
+  /// backend does.
+  Future<({String videoId, String url})> resolveStream(
+    DiscoveredTrack track, {
+    String? videoId,
+  }) async {
+    if (YtDlp.available) {
+      final audio = await _ytdlp.resolve(
+        videoId != null
+            ? YtDlp.videoTarget(videoId)
+            : YtDlp.searchTarget(track.name, track.artist),
+      );
+      return (videoId: audio.videoId, url: audio.url);
+    }
+    final id = videoId ?? await fetchYoutubeVideoId(track.name, track.artist);
+    return (videoId: id, url: await getDownloadUrl(id));
+  }
 
   // ---------------------------------------------------------------------------
   // Download bookkeeping (de-duplication)
@@ -171,6 +198,16 @@ class MusicDiscoveryService {
         return DownloadResult.permissionDenied;
       }
 
+      if (YtDlp.available) {
+        return await _downloadWithYtDlp(
+          track,
+          key,
+          coverUrl: coverUrl,
+          onProgress: onProgress,
+          onError: onError,
+        );
+      }
+
       final String mp3Url;
       try {
         final videoId = await fetchYoutubeVideoId(track.name, track.artist);
@@ -202,6 +239,39 @@ class MusicDiscoveryService {
     } finally {
       _inProgressKeys.remove(key);
     }
+  }
+
+  /// Android: yt-dlp saves the audio (converted to MP3 when it can) in the
+  /// app's cache, then it's moved into the music folder and tagged.
+  Future<DownloadResult> _downloadWithYtDlp(
+    DiscoveredTrack track,
+    String key, {
+    Future<String?>? coverUrl,
+    void Function(int received, int total)? onProgress,
+    void Function(String message)? onError,
+  }) async {
+    final File temp;
+    try {
+      final cache = await getTemporaryDirectory();
+      temp = await _ytdlp.download(
+        YtDlp.searchTarget(track.name, track.artist),
+        dir: '${cache.path}/ytdlp',
+        id: 'dl${DateTime.now().microsecondsSinceEpoch}',
+        // Reported as tenths of a percent, so the bar moves smoothly.
+        onProgress: (percent) => onProgress?.call((percent * 10).round(), 1000),
+      );
+    } on DiscoverException catch (e) {
+      onError?.call(e.message);
+      return DownloadResult.noSource;
+    }
+    final saved = await saveLocalFile(
+      temp,
+      track.name,
+      tag: (file) => _tag(file, track, coverUrl),
+    );
+    if (saved == null) return DownloadResult.failed;
+    await _markDownloaded(key);
+    return DownloadResult.success;
   }
 
   /// Ensure we can write into the public Music folder.
@@ -257,46 +327,77 @@ class MusicDiscoveryService {
     Future<void> Function(File file)? tag,
   }) async {
     try {
-      var filename = _sanitizeFileName(rawFilename);
-      if (!filename.toLowerCase().endsWith('.mp3')) {
-        filename = '$filename.mp3';
-      }
-
-      final folder = await downloadDirectory();
-      final dir = Directory(folder);
-      if (!await dir.exists()) {
-        await dir.create(recursive: true);
-      }
-
-      // Avoid clobbering an existing file with the same name.
-      var filePath = '$folder/$filename';
-      if (await File(filePath).exists()) {
-        final base = filename.substring(0, filename.length - 4); // strip .mp3
-        var n = 1;
-        do {
-          filePath = '$folder/$base ($n).mp3';
-          n++;
-        } while (await File(filePath).exists());
-      }
-
+      final filePath = await _newFilePath(rawFilename, 'mp3');
       await _download(url, filePath, onProgress);
       // Before the media scan, so the Library reads the new tags.
       if (tag != null) await tag(File(filePath));
-
-      // Make the new file visible in the media library straight away
-      // (Android only; on iOS the file stays in the app's sandbox).
-      if (!Platform.isIOS) {
-        try {
-          await _audioQuery.scanMedia(filePath);
-        } catch (e) {
-          _logError('Media scan failed for $filePath: $e');
-        }
-      }
-
+      await _register(filePath);
       return filePath;
     } catch (e) {
       _logError('Error saving file: $e');
       return null;
+    }
+  }
+
+  /// Moves an already-downloaded [source] (from yt-dlp) into the music
+  /// folder, tags it when it's an MP3 and registers it with the media
+  /// library. Returns the saved file path, or null on failure.
+  Future<String?> saveLocalFile(
+    File source,
+    String rawFilename, {
+    Future<void> Function(File file)? tag,
+  }) async {
+    try {
+      final dot = source.path.lastIndexOf('.');
+      final ext = dot > 0 ? source.path.substring(dot + 1).toLowerCase() : 'm4a';
+      final filePath = await _newFilePath(rawFilename, ext);
+      // Copy, not rename: the cache and the music folder can be on
+      // different storage.
+      await source.copy(filePath);
+      try {
+        await source.delete();
+      } catch (_) {}
+      // Only MP3 tags are written; other formats keep yt-dlp's.
+      if (tag != null && ext == 'mp3') await tag(File(filePath));
+      await _register(filePath);
+      return filePath;
+    } catch (e) {
+      _logError('Error saving file: $e');
+      try {
+        if (await source.exists()) await source.delete();
+      } catch (_) {}
+      return null;
+    }
+  }
+
+  /// A free path in the music folder for [rawFilename] with [ext], without
+  /// clobbering an existing file of the same name.
+  Future<String> _newFilePath(String rawFilename, String ext) async {
+    var base = _sanitizeFileName(rawFilename);
+    final suffix = '.$ext';
+    if (base.toLowerCase().endsWith(suffix)) {
+      base = base.substring(0, base.length - suffix.length);
+    }
+    final folder = await downloadDirectory();
+    final dir = Directory(folder);
+    if (!await dir.exists()) await dir.create(recursive: true);
+    var filePath = '$folder/$base$suffix';
+    var n = 1;
+    while (await File(filePath).exists()) {
+      filePath = '$folder/$base ($n)$suffix';
+      n++;
+    }
+    return filePath;
+  }
+
+  /// Makes a new file visible in the media library straight away (Android
+  /// only; on iOS the file stays in the app's sandbox).
+  Future<void> _register(String filePath) async {
+    if (Platform.isIOS) return;
+    try {
+      await _audioQuery.scanMedia(filePath);
+    } catch (e) {
+      _logError('Media scan failed for $filePath: $e');
     }
   }
 

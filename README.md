@@ -59,7 +59,7 @@ Noir Player is a small, focused Flutter app that:
 1. **Loads your local audio files** from the device library.
 2. **Shows them in a tabbed library** (`Music`, `Audio`, `Albums`, `Artists`), with playlists one tap away.
 3. **Runs a background audio service**, so playback keeps going when the app is backgrounded or the screen is locked — with the song's title, artist and cover art on the standard media notification, which the lock screen, the Samsung Now Bar and other system media controls pick up.
-4. **Discovers new music** — browse trending tracks and search by name through **Noir Player's server**, the same one the desktop app uses. You can add your own Last.fm, YouTube or RapidAPI keys in **Settings → Discover** if you like.
+4. **Discovers new music** — browse trending tracks and search by name, then play or download any of them. On Android, songs come straight from YouTube through **yt-dlp running on your phone**, with no key or limit. Track lists come from Last.fm through **Noir Player's server**, or with your own Last.fm key in **Settings → Discover**.
 5. **Streams & downloads** — preview tracks and save them as MP3 to your device's music folder.
 6. **Tailors playback** — skip back / forward by your own seek interval, sleep timer, playback speed, resume‑after‑a‑call and more, all in a sectioned Settings page reached from the side drawer.
 
@@ -75,7 +75,7 @@ Noir Player is a small, focused Flutter app that:
 | ▶️ **Now Playing** | `player_screen.dart` | Reactive UI bound to the now-playing and playback-state providers |
 | 🔊 **Background Playback** | `audio_handler.dart` | `audio_service` + `just_audio` with a standard media notification (title, artist, cover art) that the lock screen, Samsung Now Bar and other system media controls show |
 | 🧭 **Discover** | `discover_screen.dart` | Trending + search with album art, through Noir Player's server or your own keys |
-| ⬇️ **Download** | `music_discovery_service.dart` | Resolves YouTube → MP3 and saves straight into your Music folder, with duplicate‑download protection |
+| ⬇️ **Download** | `music_discovery_service.dart` | yt-dlp fetches the song's audio on the phone (MP3, with its album cover, title and artist), saved straight into your Music folder, with duplicate‑download protection |
 | 🎚️ **Equalizer** | `equalizer_screen.dart` | Native equalizer bands and presets |
 | ⏱️ **Sleep Timer** | `sleep_timer_service.dart` | Auto‑pause after a chosen duration, with a live countdown |
 | ⏪ **Skip Back / Forward** | `player_screen.dart` | Back / forward buttons that jump by your seek interval (5–60 s or a custom 1–300 s, set in Settings → Playback), also used by the notification, lock screen and headset |
@@ -180,7 +180,8 @@ lib/
 │   ├── services/
 │   │   ├── audio_handler.dart           # Background audio, media controls, interruptions
 │   │   ├── discover_api.dart            # Discover requests: Noir Player's server or your own keys
-│   │   └── music_discovery_service.dart # Last.fm + YouTube + MP3 download
+│   │   ├── music_discovery_service.dart # Last.fm + YouTube + MP3 download
+│   │   └── ytdlp.dart                   # yt-dlp on the phone (Android)
 │   ├── state/                           # Riverpod providers
 │   │   ├── settings.dart                # Persisted user preferences
 │   │   ├── playlists.dart               # Playlists + Favourites, saved to playlists.json
@@ -235,20 +236,28 @@ flutter pub get
 
 ### 🔑 Discover Setup
 
-Discover works out of the box: trending tracks, search, YouTube lookups and MP3
-resolution all run through **Noir Player's server** (`https://noir-player-api.vercel.app`),
-the same one the desktop app uses. There is nothing to configure.
+Discover works out of the box, with nothing to configure.
+
+- **On Android**, finding, playing and downloading a song is done by
+  [yt-dlp](https://github.com/yt-dlp/yt-dlp) running on the phone itself (through
+  [youtubedl-android](https://github.com/yausername/youtubedl-android)). The phone asks
+  YouTube directly, so there's no API key, quota or server in between. yt-dlp keeps itself
+  up to date from its GitHub releases, about once a day.
+- **The trending list and search** come from Last.fm through **Noir Player's server**
+  (`https://noir-player-api.vercel.app`), the same one the desktop app uses.
+- **On iOS**, YouTube lookups and audio still go through Noir Player's server.
 
 If you have API keys of your own, you can add them in **Settings → Discover**. Any service
 you enter a key for is called directly with your key; the others keep going through
 Noir Player's server. Keys are stored on your device only, and clearing a field switches
-that service back to the server.
+that service back to the server. On Android only the Last.fm key is shown, since yt-dlp
+replaces the other two.
 
 | Setting | Get a key from |
 |---|---|
 | Last.fm API key | https://www.last.fm/api/account/create |
-| YouTube Data API key | https://console.cloud.google.com/apis/credentials (YouTube Data API v3) |
-| RapidAPI key | https://rapidapi.com/ (subscribe to the **youtube-mp36** API) |
+| YouTube Data API key (iOS) | https://console.cloud.google.com/apis/credentials (YouTube Data API v3) |
+| RapidAPI key (iOS) | https://rapidapi.com/ |
 
 > 💡 The rest of the app (local library + playback) works offline; only the Discover tab needs a connection.
 
@@ -305,14 +314,18 @@ flutter build appbundle --release            # build/app/outputs/bundle/release/
                                                    ▼
                                     ┌──────────────────────────────┐
                                     │ MusicDiscoveryService         │
-                                    │ Last.fm → YouTube → MP3 → save │
+                                    │ Last.fm → yt-dlp → MP3 → save  │
                                     └──────────────────────────────┘
 ```
 
-**Download flow:** pick a track → look up its YouTube video ID → resolve an MP3 URL
-(RapidAPI) → stream-download the MP3 straight from that link with `http` (with progress) →
-save to the device's Music folder. The lookup and resolve steps run through Noir Player's
-server, or directly with your own key for any service you added one for in Settings.
+**Download flow (Android):** pick a track → yt-dlp on the phone searches YouTube for it and
+downloads its audio (with progress), converting it to MP3 with FFmpeg → the album cover,
+title and artist are written into the file → it's saved to the device's Music folder. If
+FFmpeg can't run on a phone, the original `.m4a` is kept instead. Playing works the same way:
+yt-dlp gives a direct stream link that the player opens.
+
+On iOS the YouTube lookup and MP3 link come from Noir Player's server, or directly with your
+own key for any service you added one for in Settings.
 
 ---
 
@@ -343,10 +356,11 @@ server, or directly with your own key for any service you added one for in Setti
 | [`flutter_riverpod`](https://pub.dev/packages/flutter_riverpod) · [`shared_preferences`](https://pub.dev/packages/shared_preferences) | State & persistence |
 | [`http`](https://pub.dev/packages/http) | Networking & file download |
 | [`cached_network_image`](https://pub.dev/packages/cached_network_image) | Discover artwork, cached between launches |
-
-> Discover album covers are looked up by song and artist in the [Deezer](https://developers.deezer.com/api) and [iTunes Search](https://performance-partners.apple.com/search-api) APIs (no account or key). Only the song title and artist are sent, and covers are cached on the device.
 | [`path_provider`](https://pub.dev/packages/path_provider) | Locating device folders for downloads |
 | [`flutter_animate`](https://pub.dev/packages/flutter_animate) | UI animations |
+| [`youtubedl-android`](https://github.com/yausername/youtubedl-android) (Android, Gradle) | Runs [yt-dlp](https://github.com/yt-dlp/yt-dlp) with Python and FFmpeg on the phone, for Discover |
+
+> Discover album covers are looked up by song and artist in the [Deezer](https://developers.deezer.com/api) and [iTunes Search](https://performance-partners.apple.com/search-api) APIs (no account or key). Only the song title and artist are sent, and covers are cached on the device.
 
 > Run `flutter pub get` to install everything declared in `pubspec.yaml`.
 
@@ -366,7 +380,13 @@ you'd like to change.
 
 ## 📄 License
 
-Distributed under the **MIT License**. See [LICENSE](LICENSE) for details.
+Noir Player's own code is distributed under the **MIT License**. See [LICENSE](LICENSE) for details.
+
+The Android app bundles [youtubedl-android](https://github.com/yausername/youtubedl-android)
+(GPL-3.0), which includes [yt-dlp](https://github.com/yt-dlp/yt-dlp) (Unlicense), Python
+(PSF License) and FFmpeg (LGPL/GPL). Because of youtubedl-android, Android builds (APK / AAB)
+as a whole are distributed under the terms of the **GPL-3.0**; the complete source for them
+is this repository.
 
 ---
 
