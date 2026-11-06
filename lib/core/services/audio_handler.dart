@@ -91,6 +91,10 @@ class AudioPlayerHandler extends BaseAudioHandler {
   /// phone-call interruption ends.
   bool _playIntent = false;
 
+  /// Set when another app (YouTube, a call...) takes audio focus, cleared
+  /// once focus comes back on its own. See [_reclaimFocusIfLost].
+  bool _focusInterrupted = false;
+
   static const _kLastSong = 'playback.lastSong';
 
   /// MediaItem extra holding a local song's file path, so the song that is
@@ -393,6 +397,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
         await _player.seek(Duration.zero, index: index);
       }
       _playIntent = true;
+      await _reclaimFocusIfLost();
       await _player.play();
     } catch (e) {
       debugPrint('❌ Error playing song at $index: $e');
@@ -435,6 +440,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
     );
     _initEqualizer();
     _playIntent = true;
+    await _reclaimFocusIfLost();
     await _player.play();
   }
 
@@ -565,9 +571,40 @@ class AudioPlayerHandler extends BaseAudioHandler {
   Future<void> skipToQueueItem(int index) => playSongAt(index);
 
   @override
-  Future<void> play() {
+  Future<void> play() async {
     _playIntent = true;
+    await _reclaimFocusIfLost(freshOutput: true);
     return _player.play();
+  }
+
+  /// After another app took audio focus, drop Noir Player's old focus
+  /// request before playing, so playing asks Android for focus again.
+  ///
+  /// audio_session keeps its request after a temporary loss and then reports
+  /// success on the next play without asking again. Playing without focus
+  /// while the other app holds it leaves the player faded to silence on
+  /// Android 12+: the song runs with no sound until a new track starts.
+  ///
+  /// With [freshOutput] (resuming the paused song) the native player is also
+  /// released, so play rebuilds it at the same song and position: a new audio
+  /// output that Android hasn't faded, whatever kind of focus loss it was.
+  Future<void> _reclaimFocusIfLost({bool freshOutput = false}) async {
+    if (!_focusInterrupted) return;
+    _focusInterrupted = false;
+    try {
+      await (await AudioSession.instance).setActive(false);
+    } catch (e) {
+      debugPrint('❌ Releasing audio focus failed: $e');
+    }
+    if (freshOutput &&
+        !_player.playing &&
+        _player.processingState != ProcessingState.idle) {
+      try {
+        await _player.stop(); // play() reloads at the current position
+      } catch (e) {
+        debugPrint('❌ Releasing the player failed: $e');
+      }
+    }
   }
 
   @override
@@ -665,6 +702,8 @@ class AudioPlayerHandler extends BaseAudioHandler {
       // just_audio pauses on interruption begin; resume on end when the user
       // still intends to play and the "resume after a call" setting is on.
       session.interruptionEventStream.listen((event) {
+        // A loss of focus starts an interruption; regaining it ends one.
+        _focusInterrupted = event.begin;
         if (!event.begin &&
             event.type == AudioInterruptionType.pause &&
             _playIntent &&
