@@ -311,6 +311,30 @@ YouTubeAudio parseYouTubeAudio(Map<String, Object?>? map) {
 @visibleForTesting
 String friendlyYouTubeError(String? raw) {
   final text = (raw ?? '').trim();
+  final message = _friendly(text);
+  if (message == null) {
+    final first = _firstLine(text);
+    return first.isEmpty
+        ? 'Couldn\'t get this song from YouTube.'
+        : 'Couldn\'t get this song from YouTube. (${_short(first)})';
+  }
+  // The technical reason, shortened, helps when reporting a problem.
+  final first = _firstLine(text);
+  final plain = message.startsWith('No ') || message == 'Download cancelled.';
+  return first.isEmpty || plain ? message : '$message (${_short(first, 90)})';
+}
+
+String _firstLine(String text) => text
+    .split('\n')
+    .map((l) => l.trim())
+    .firstWhere((l) => l.isNotEmpty, orElse: () => '');
+
+String _short(String s, [int max = 140]) =>
+    s.length > max ? '${s.substring(0, max)}…' : s;
+
+/// The plain-language part of [friendlyYouTubeError], or null when the
+/// error isn't one of the known kinds.
+String? _friendly(String text) {
   final low = text.toLowerCase();
   if (low.contains('signinconfirmnotbot') ||
       low.contains('a bot') ||
@@ -362,12 +386,5 @@ String friendlyYouTubeError(String? raw) {
         'fix it.';
   }
   if (low.contains('download cancelled')) return 'Download cancelled.';
-  final first = text
-      .split('\n')
-      .map((l) => l.trim())
-      .firstWhere((l) => l.isNotEmpty, orElse: () => '');
-  return first.isEmpty
-      ? 'Couldn\'t get this song from YouTube.'
-      : 'Couldn\'t get this song from YouTube. '
-            '(${first.length > 140 ? '${first.substring(0, 140)}…' : first})';
+  return null;
 }

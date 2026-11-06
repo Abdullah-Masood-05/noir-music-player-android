@@ -110,7 +110,19 @@ class YouTubeChannel(private val context: Context, messenger: BinaryMessenger) :
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "resolve" -> run(result) {
-                resolve(call.argument<String>("query"), call.argument<String>("videoId"))
+                val query = call.argument<String>("query")
+                val videoId = call.argument<String>("videoId")
+                // A dropped connection or slow answer is often gone a moment
+                // later: try once more before giving up.
+                try {
+                    resolve(query, videoId)
+                } catch (e: IOException) {
+                    // "No matching video" and the like won't change.
+                    if (e.message?.startsWith("No ") == true) throw e
+                    Log.w(TAG, "Resolving failed, retrying", e)
+                    Thread.sleep(800)
+                    resolve(query, videoId)
+                }
             }
             "download" -> run(result) {
                 download(
