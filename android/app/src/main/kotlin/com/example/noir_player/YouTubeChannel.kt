@@ -27,9 +27,14 @@ import org.schabi.newpipe.streams.Mp4FromDashWriter
 import us.shandian.giga.io.FileStream
 import java.io.File
 import java.io.IOException
+import java.io.RandomAccessFile
+import java.util.Collections
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Discover's YouTube access on Android, through NewPipe Extractor
@@ -59,7 +64,7 @@ class YouTubeChannel(private val context: Context, messenger: BinaryMessenger) :
 
     private class Download {
         @Volatile var cancelled = false
-        @Volatile var call: Call? = null
+        val calls: MutableSet<Call> = Collections.newSetFromMap(ConcurrentHashMap())
     }
 
     init {
@@ -127,9 +132,9 @@ class YouTubeChannel(private val context: Context, messenger: BinaryMessenger) :
             }
             "cancel" -> run(result) {
                 val id = call.argument<String>("id") ?: error("no id")
-                downloads[id]?.let {
-                    it.cancelled = true
-                    it.call?.cancel()
+                downloads[id]?.let { job ->
+                    job.cancelled = true
+                    job.calls.forEach { it.cancel() }
                 }
                 null
             }
@@ -273,8 +278,9 @@ class YouTubeChannel(private val context: Context, messenger: BinaryMessenger) :
     private class CancelledException : IOException("Download cancelled")
 
     /**
-     * Saves the stream at [url] to [path] in 1 MiB ranges, which YouTube
-     * serves at full speed (one long request gets slowed to playback speed).
+     * Saves the stream at [url] to [path] in 1 MiB ranges, [PARALLEL] at a
+     * time. YouTube serves short ranges at full speed (one long request gets
+     * slowed to playback speed), and several at once fill the connection.
      */
     private fun download(
         url: String,
@@ -287,58 +293,51 @@ class YouTubeChannel(private val context: Context, messenger: BinaryMessenger) :
         downloads[id] = job
         val file = File(path)
         file.parentFile?.mkdirs()
+        file.delete()
         try {
-            var total = knownLength
-            var received = 0L
-            var lastReport = 0L
-            var requestNumber = 0
-            file.outputStream().use { out ->
-                val buffer = ByteArray(64 * 1024)
-                while (total < 0 || received < total) {
-                    if (job.cancelled) throw CancelledException()
-                    val end = received + CHUNK - 1
-                    val request = streamRequest(url, headers, received, end, requestNumber++)
-                    val call = downloader.client.newCall(request)
-                    job.call = call
-                    call.execute().use { response ->
-                        if (response.code != 206 && response.code != 200) {
-                            throw IOException("HTTP ${response.code} from YouTube")
-                        }
-                        if (total < 0) {
-                            total = response.header("Content-Range")
-                                ?.substringAfterLast('/')?.toLongOrNull()
-                                ?: response.body?.contentLength()?.takeIf {
-                                    response.code == 200 && it > 0
+            val total = if (knownLength > 0) knownLength else streamLength(url, headers, job)
+            val received = AtomicLong(0)
+            val lastReport = AtomicLong(0)
+            val nextChunk = AtomicLong(0)
+            val requestNumber = AtomicInteger(0)
+            val failure = AtomicReference<Throwable?>(null)
+            val chunks = (total + CHUNK - 1) / CHUNK
+
+            RandomAccessFile(file, "rw").use { out ->
+                out.setLength(total)
+                val workers = (0 until minOf(PARALLEL.toLong(), chunks).toInt()).map {
+                    Thread {
+                        val buffer = ByteArray(64 * 1024)
+                        while (failure.get() == null) {
+                            val index = nextChunk.getAndIncrement()
+                            if (index >= chunks) break
+                            val from = index * CHUNK
+                            val to = minOf(from + CHUNK, total) - 1
+                            try {
+                                fetchChunk(url, headers, from, to, requestNumber, job, buffer) { offset, n ->
+                                    synchronized(out) {
+                                        out.seek(offset)
+                                        out.write(buffer, 0, n)
+                                    }
+                                    val sum = received.addAndGet(n.toLong())
+                                    val now = System.currentTimeMillis()
+                                    val last = lastReport.get()
+                                    if (now - last >= 150 && lastReport.compareAndSet(last, now)) {
+                                        report(id, sum, total)
+                                    }
                                 }
-                                ?: -1L
-                        }
-                        val body = response.body ?: throw IOException("Empty answer from YouTube")
-                        val before = received
-                        body.byteStream().use { input ->
-                            while (true) {
-                                if (job.cancelled) throw CancelledException()
-                                val n = input.read(buffer)
-                                if (n < 0) break
-                                out.write(buffer, 0, n)
-                                received += n
-                                val now = System.currentTimeMillis()
-                                if (now - lastReport >= 150) {
-                                    lastReport = now
-                                    report(id, received, total)
-                                }
+                            } catch (e: Throwable) {
+                                failure.compareAndSet(null, e)
+                                job.calls.forEach { it.cancel() }
                             }
                         }
-                        if (received == before) {
-                            if (total < 0) total = received else throw IOException("YouTube stopped sending audio")
-                        }
-                        // A whole-file answer: done.
-                        if (response.code == 200) total = received
-                    }
-                    if (total < 0) break
+                    }.apply { start() }
                 }
+                workers.forEach { it.join() }
             }
-            if (received == 0L) throw IOException("YouTube sent no audio")
-            report(id, received, received)
+            failure.get()?.let { throw it }
+            if (job.cancelled) throw CancelledException()
+            report(id, total, total)
             return path
         } catch (e: Throwable) {
             file.delete()
@@ -346,6 +345,75 @@ class YouTubeChannel(private val context: Context, messenger: BinaryMessenger) :
             throw e
         } finally {
             downloads.remove(id)
+        }
+    }
+
+    /**
+     * Fetches bytes [from]..[to] (inclusive), retrying twice, and hands each
+     * piece to [write] with its file offset.
+     */
+    private fun fetchChunk(
+        url: String,
+        headers: Map<String, String>,
+        from: Long,
+        to: Long,
+        requestNumber: AtomicInteger,
+        job: Download,
+        buffer: ByteArray,
+        write: (offset: Long, n: Int) -> Unit,
+    ) {
+        var position = from
+        var attempt = 0
+        while (position <= to) {
+            if (job.cancelled) throw CancelledException()
+            try {
+                val request = streamRequest(url, headers, position, to, requestNumber.getAndIncrement())
+                val call = downloader.client.newCall(request)
+                job.calls.add(call)
+                try {
+                    call.execute().use { response ->
+                        if (response.code != 206) {
+                            throw IOException("HTTP ${response.code} from YouTube")
+                        }
+                        val body = response.body ?: throw IOException("Empty answer from YouTube")
+                        body.byteStream().use { input ->
+                            while (position <= to) {
+                                if (job.cancelled) throw CancelledException()
+                                val want = minOf(buffer.size.toLong(), to - position + 1).toInt()
+                                val n = input.read(buffer, 0, want)
+                                if (n < 0) break
+                                write(position, n)
+                                position += n
+                            }
+                        }
+                    }
+                } finally {
+                    job.calls.remove(call)
+                }
+                if (position <= to) throw IOException("YouTube stopped sending audio")
+            } catch (e: CancelledException) {
+                throw e
+            } catch (e: IOException) {
+                if (job.cancelled) throw CancelledException()
+                // HTTP refusals won't change on a retry; dropped connections may.
+                if (++attempt > 2 || e.message?.startsWith("HTTP 4") == true) throw e
+                Thread.sleep(500L * attempt)
+            }
+        }
+    }
+
+    /** The stream's size, from the answer to a one-byte request. */
+    private fun streamLength(url: String, headers: Map<String, String>, job: Download): Long {
+        val call = downloader.client.newCall(streamRequest(url, headers, 0, 0, 0))
+        job.calls.add(call)
+        try {
+            call.execute().use { response ->
+                return response.header("Content-Range")?.substringAfterLast('/')?.toLongOrNull()
+                    ?.takeIf { it > 0 }
+                    ?: throw IOException("YouTube didn't give the audio's size")
+            }
+        } finally {
+            job.calls.remove(call)
         }
     }
 
@@ -445,6 +513,7 @@ class YouTubeChannel(private val context: Context, messenger: BinaryMessenger) :
     companion object {
         private const val TAG = "NoirYouTube"
         private const val CHUNK = 1024L * 1024
+        private const val PARALLEL = 4
         private val POST_BODY = byteArrayOf(0x78, 0)
     }
 }
