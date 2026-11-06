@@ -1,5 +1,6 @@
 package com.example.noir_player
 
+import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -46,7 +47,7 @@ import java.util.concurrent.Executors
  *    into a normal one (NewPipe's muxer) with the tags and cover inside.
  *  - cancel(id).
  */
-class YouTubeChannel(messenger: BinaryMessenger) :
+class YouTubeChannel(private val context: Context, messenger: BinaryMessenger) :
     MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
 
     private val executor = Executors.newCachedThreadPool()
@@ -71,6 +72,26 @@ class YouTubeChannel(messenger: BinaryMessenger) :
         )
         MethodChannel(messenger, "noir/youtube").setMethodCallHandler(this)
         EventChannel(messenger, "noir/youtube/progress").setStreamHandler(this)
+        executor.execute { removeYtDlpLeftovers() }
+    }
+
+    /**
+     * Test builds used yt-dlp, which unpacked Python, yt-dlp and FFmpeg (about
+     * 125 MB) into the app's storage. Nothing uses them now: free the space.
+     */
+    private fun removeYtDlpLeftovers() {
+        try {
+            listOf(
+                File(context.noBackupFilesDir, "youtubedl-android"),
+                File(context.cacheDir, "ytdlp"),
+            ).filter { it.exists() }.forEach { it.deleteRecursively() }
+            for (prefs in listOf("youtubedl-android", "noir_ytdlp")) {
+                val file = File(context.applicationInfo.dataDir, "shared_prefs/$prefs.xml")
+                if (file.exists()) file.delete()
+            }
+        } catch (e: Throwable) {
+            Log.w(TAG, "Couldn't remove yt-dlp's old files", e)
+        }
     }
 
     override fun onListen(arguments: Any?, sink: EventChannel.EventSink?) {

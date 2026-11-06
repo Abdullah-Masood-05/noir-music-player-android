@@ -7,6 +7,6 @@ class MainActivity : AudioServiceActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         // YouTube for Discover (find, play and download), via NewPipe Extractor.
-        YouTubeChannel(flutterEngine.dartExecutor.binaryMessenger)
+        YouTubeChannel(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
     }
 }
