@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:just_audio/just_audio.dart';
 
 import 'discover_api.dart' show DiscoverException, backendVideoQuery;
+import 'youtube_search.dart';
 
 /// The audio of one YouTube video, as NewPipe Extractor found it on this
 /// phone.
@@ -21,6 +22,7 @@ class YouTubeAudio {
     this.contentLength = -1,
     this.mime = 'audio/mp4',
     this.ext = 'm4a',
+    this.post = true,
   });
 
   final String videoId;
@@ -41,21 +43,46 @@ class YouTubeAudio {
   /// File extension for a download: "m4a", or "webm" in the rare case a
   /// video has no M4A audio.
   final String ext;
+
+  /// Whether [url] is fetched the way NewPipe's player does (a POST with a
+  /// tiny body, Android), or with plain GETs (iOS).
+  final bool post;
 }
 
-/// YouTube on the phone (Android) through the app's native "noir/youtube"
-/// channel, which runs NewPipe Extractor. Discover uses it to find, play and
-/// download songs without any API key or shared quota.
+/// YouTube on the phone through the app's native "noir/youtube" channel.
+/// Discover uses it to find, play and download songs without any API key or
+/// shared quota.
+///
+/// On Android the channel runs NewPipe Extractor and does everything. On iOS
+/// it runs YouTubeKit, which finds a video's audio and rebuilds the
+/// downloaded file; searching and downloading are done here in Dart.
 class YouTubeNative {
-  YouTubeNative({MethodChannel? channel, EventChannel? progress})
-    : _channel = channel ?? const MethodChannel('noir/youtube'),
-      _progress = progress ?? const EventChannel('noir/youtube/progress');
+  YouTubeNative({
+    MethodChannel? channel,
+    EventChannel? progress,
+    http.Client? client,
+    bool? searchAndDownloadHere,
+  }) : _channel = channel ?? const MethodChannel('noir/youtube'),
+       _progress = progress ?? const EventChannel('noir/youtube/progress'),
+       _client = client,
+       _here = searchAndDownloadHere ?? (!kIsWeb && Platform.isIOS);
 
   final MethodChannel _channel;
   final EventChannel _progress;
+  final http.Client? _client;
+  http.Client? _ownClient;
 
-  /// Whether this platform has it. On iOS Discover uses the backend.
-  static bool get available => !kIsWeb && Platform.isAndroid;
+  /// Search and download in Dart (iOS) rather than natively (Android).
+  final bool _here;
+
+  /// Downloads running here, by id, that were asked to stop.
+  final Set<String> _cancelled = {};
+
+  http.Client get _http => _client ?? (_ownClient ??= http.Client());
+
+  /// Whether this platform has it.
+  static bool get available =>
+      !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
   /// What to search YouTube for to find a song.
   static String searchQuery(String trackName, String artistName) =>
@@ -64,6 +91,9 @@ class YouTubeNative {
   /// The best audio of the first song matching [query], or of [videoId].
   Future<YouTubeAudio> resolve({String? query, String? videoId}) async {
     try {
+      if (_here && videoId == null && query != null) {
+        videoId = await YouTubeSearch(_http).videoId(query);
+      }
       final map = await _channel.invokeMapMethod<String, Object?>('resolve', {
         'query': query,
         'videoId': videoId,
@@ -71,6 +101,11 @@ class YouTubeNative {
       return parseYouTubeAudio(map);
     } on PlatformException catch (e) {
       throw DiscoverException(friendlyYouTubeError(e.message));
+    } on DiscoverException {
+      rethrow;
+    } catch (e) {
+      // The search (iOS), or a build without the native side.
+      throw DiscoverException(friendlyYouTubeError('$e'));
     }
   }
 
@@ -82,6 +117,24 @@ class YouTubeNative {
     required String id,
     void Function(int received, int total)? onProgress,
   }) async {
+    if (_here) {
+      _cancelled.remove(id);
+      try {
+        return await downloadYouTubeAudio(
+          _http,
+          audio,
+          path,
+          onProgress: onProgress,
+          cancelled: () => _cancelled.contains(id),
+        );
+      } on DiscoverException {
+        rethrow;
+      } catch (e) {
+        throw DiscoverException(friendlyYouTubeError('$e'));
+      } finally {
+        _cancelled.remove(id);
+      }
+    }
     StreamSubscription<dynamic>? sub;
     if (onProgress != null) {
       sub = _progress.receiveBroadcastStream().listen((event) {
@@ -137,6 +190,10 @@ class YouTubeNative {
   }
 
   Future<void> cancel(String id) async {
+    if (_here) {
+      _cancelled.add(id);
+      return;
+    }
     try {
       await _channel.invokeMethod<void>('cancel', {'id': id});
     } catch (_) {}
@@ -254,14 +311,20 @@ class _Refused implements Exception {
 }
 
 /// One ranged request for a YouTube stream link (bytes [start] to [end],
-/// inclusive), shaped like NewPipe's player sends it: a POST with a tiny body
-/// and a request number.
+/// inclusive). On Android it's shaped like NewPipe's player sends it: a POST
+/// with a tiny body and a request number. On iOS it's a plain GET.
 http.Request youTubeStreamRequest(
   YouTubeAudio audio,
   int start,
   int end,
   int requestNumber,
 ) {
+  if (!audio.post) {
+    return http.Request('GET', Uri.parse(audio.url))
+      ..headers.addAll(audio.headers)
+      ..headers['Range'] = 'bytes=$start-$end'
+      ..headers['Accept-Encoding'] = 'identity';
+  }
   var url = audio.url;
   if (url.contains('/videoplayback') && !url.contains('&rn=')) {
     url = '$url&rn=$requestNumber';
@@ -304,7 +367,133 @@ YouTubeAudio parseYouTubeAudio(Map<String, Object?>? map) {
     contentLength: length is num ? length.toInt() : -1,
     mime: mime is String && mime.isNotEmpty ? mime : 'audio/mp4',
     ext: ext is String && ext.isNotEmpty ? ext : 'm4a',
+    post: map['post'] != false,
   );
+}
+
+/// Saves [audio]'s stream to [path] in 1 MiB ranges, four at a time, like
+/// the Android side does: one long request gets slowed to playback speed. A
+/// range that fails is asked for again twice, unless YouTube refused it
+/// (HTTP 4xx).
+Future<File> downloadYouTubeAudio(
+  http.Client client,
+  YouTubeAudio audio,
+  String path, {
+  void Function(int received, int total)? onProgress,
+  bool Function()? cancelled,
+  int chunkSize = 1024 * 1024,
+  int parallel = 4,
+}) async {
+  var requestNumber = 0;
+  var total = audio.contentLength;
+  if (total <= 0) {
+    // Not given: ask for the first byte and read the size from the answer.
+    final response = await client.send(
+      youTubeStreamRequest(audio, 0, 0, requestNumber++),
+    );
+    await response.stream.drain<void>();
+    if (response.statusCode >= 400) {
+      throw HttpException('HTTP ${response.statusCode} from YouTube');
+    }
+    total =
+        int.tryParse(
+          (response.headers['content-range'] ?? '').split('/').last,
+        ) ??
+        -1;
+    if (total <= 0) throw const HttpException('YouTube sent no audio');
+  }
+
+  final file = File(path);
+  await file.parent.create(recursive: true);
+  final out = await file.open(mode: FileMode.write);
+  // A RandomAccessFile allows one operation at a time: writes take turns.
+  var writing = Future<void>.value();
+  Future<void> write(int at, List<int> bytes) {
+    final next = writing.then((_) async {
+      await out.setPosition(at);
+      await out.writeFrom(bytes);
+    });
+    writing = next.catchError((Object _) {});
+    return next;
+  }
+
+  final chunks = (total + chunkSize - 1) ~/ chunkSize;
+  var nextChunk = 0;
+  var received = 0;
+  var lastReport = DateTime.fromMillisecondsSinceEpoch(0);
+  void report({bool force = false}) {
+    final now = DateTime.now();
+    if (!force && now.difference(lastReport).inMilliseconds < 150) return;
+    lastReport = now;
+    onProgress?.call(received, total);
+  }
+
+  Future<List<int>> fetch(int start, int end) async {
+    for (var attempt = 0; ; attempt++) {
+      if (cancelled?.call() ?? false) {
+        throw const HttpException('Download cancelled.');
+      }
+      try {
+        final response = await client
+            .send(youTubeStreamRequest(audio, start, end, requestNumber++))
+            .timeout(const Duration(seconds: 20));
+        final status = response.statusCode;
+        if (status != 206 && status != 200) {
+          await response.stream.drain<void>();
+          throw _Refused('HTTP $status from YouTube', retry: status >= 500);
+        }
+        final bytes = await response.stream.toBytes().timeout(
+          const Duration(seconds: 60),
+        );
+        // A whole-file answer starts at byte 0.
+        final from = status == 200 ? start : 0;
+        final want = end - start + 1;
+        if (bytes.length < from + want) {
+          throw const _Refused('YouTube stopped sending audio');
+        }
+        return bytes.sublist(from, from + want);
+      } on _Refused catch (e) {
+        if (!e.retry || attempt >= 2) rethrow;
+      } catch (_) {
+        if (attempt >= 2) rethrow;
+      }
+      await Future<void>.delayed(Duration(milliseconds: 500 * (attempt + 1)));
+    }
+  }
+
+  Future<void> worker() async {
+    while (nextChunk < chunks) {
+      final index = nextChunk++;
+      final start = index * chunkSize;
+      final end = math.min(start + chunkSize, total) - 1;
+      final bytes = await fetch(start, end);
+      await write(start, bytes);
+      received += bytes.length;
+      report();
+    }
+  }
+
+  try {
+    report(force: true);
+    await Future.wait([
+      for (var i = 0; i < math.min(parallel, chunks); i++) worker(),
+    ]);
+    await writing;
+    await out.close();
+    report(force: true);
+    return file;
+  } catch (_) {
+    // Stop the other workers from starting new ranges.
+    nextChunk = chunks;
+    try {
+      await writing;
+      await out.close();
+    } catch (_) {}
+    try {
+      if (await file.exists()) await file.delete();
+    } catch (_) {}
+    rethrow;
+  }
 }
 
 /// What a YouTube error means for the person using the app.
@@ -349,11 +538,12 @@ String? _friendly(String text) {
   if (low.contains('no playable audio')) {
     return 'No playable audio was found for this song.';
   }
-  if (low.contains('agerestricted')) {
+  if (low.contains('agerestricted') || low.contains('age restricted')) {
     return 'This song\'s video is age-restricted on YouTube, so it can\'t be '
         'played without signing in. Try another song.';
   }
   if (low.contains('geographicrestriction') ||
+      low.contains('regionblocked') ||
       low.contains('not available in client\'s country')) {
     return 'This song\'s video isn\'t available in your country. Try another '
         'song.';
@@ -362,6 +552,11 @@ String? _friendly(String text) {
       low.contains('privatecontent') ||
       low.contains('paidcontent') ||
       low.contains('musicpremium') ||
+      low.contains('videounavailable') ||
+      low.contains('videoprivate') ||
+      low.contains('video is private') ||
+      low.contains('membersonly') ||
+      low.contains('members only') ||
       low.contains('video unavailable')) {
     return 'This song\'s video isn\'t available on YouTube here. Try another '
         'song.';
@@ -373,7 +568,13 @@ String? _friendly(String text) {
       low.contains('unable to resolve host') ||
       low.contains('network is unreachable') ||
       low.contains('connection reset') ||
-      low.contains('sslhandshake')) {
+      low.contains('sslhandshake') ||
+      low.contains('urlerror') ||
+      low.contains('socketexception') ||
+      low.contains('connection closed') ||
+      low.contains('timed out') ||
+      low.contains('appears to be offline') ||
+      low.contains('network connection was lost')) {
     return 'Couldn\'t reach YouTube. Check your connection and try again.';
   }
   if (low.contains('http 429')) {

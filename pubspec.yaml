@@ -30,6 +30,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # Discover on iOS: finds songs' audio on YouTube with YouTubeKit.
+  noir_youtube_ios:
+    path: packages/noir_youtube_ios
   just_audio: ^0.10.4
   audio_service: ^0.18.18
   on_audio_query: ^2.9.0

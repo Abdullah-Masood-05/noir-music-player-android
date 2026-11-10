@@ -245,13 +245,15 @@ Discover works out of the box, with nothing to configure.
   newer NewPipe Extractor brings it back.
 - **The trending list and search** come from Last.fm through **Noir Player's server**
   (`https://noir-player-api.vercel.app`), the same one the desktop app uses.
-- **On iOS**, YouTube lookups and audio still go through Noir Player's server.
+- **On iOS**, the phone also asks YouTube directly: it searches YouTube Music itself and
+  [YouTubeKit](https://github.com/alexeichhorn/YouTubeKit) finds the song's audio. If that
+  fails, Discover falls back to Noir Player's server (or your own keys below).
 
 If you have API keys of your own, you can add them in **Settings → Discover**. Any service
 you enter a key for is called directly with your key; the others keep going through
 Noir Player's server. Keys are stored on your device only, and clearing a field switches
 that service back to the server. On Android only the Last.fm key is shown, since the phone
-reaches YouTube itself.
+reaches YouTube itself; iOS keeps the YouTube and RapidAPI keys for its fallback.
 
 | Setting | Get a key from |
 |---|---|
@@ -325,8 +327,12 @@ normal M4A, with the album cover, title and artist inside → it's saved to the 
 folder. Playing works the same way: the player streams the audio straight from YouTube,
 asking for it the way NewPipe's player does.
 
-On iOS the YouTube lookup and MP3 link come from Noir Player's server, or directly with your
-own key for any service you added one for in Settings.
+**On iOS** it's the same flow with different tools: the app searches YouTube Music (then
+YouTube) itself, YouTubeKit picks the best M4A audio, the app downloads it in 1 MiB ranges,
+and AVFoundation rebuilds it as a normal M4A with the cover, title and artist inside, without
+re-encoding. Downloads are saved in the app's Documents folder. If the phone can't get a song
+from YouTube, the YouTube lookup and MP3 link come from Noir Player's server instead, or
+directly with your own key for any service you added one for in Settings.
 
 ---
 
@@ -391,6 +397,9 @@ its MP4 muxer under `android/app/src/main/java/org/schabi/newpipe/streams/` and
 `NewPipeDownloader.kt`. Those files stay under the GPL-3.0, and Android builds (APK / AAB) as
 a whole are distributed under the terms of the **GPL-3.0**; the complete source for them is
 this repository.
+
+The iOS app uses [YouTubeKit](https://github.com/alexeichhorn/YouTubeKit) (MIT) through the
+plugin in `packages/noir_youtube_ios/`.
 
 ---
 

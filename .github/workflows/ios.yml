@@ -89,6 +89,12 @@ jobs:
       - name: Verify Flutter
         run: flutter --version
 
+      # The app's own iOS plugin (packages/noir_youtube_ios) pulls in
+      # YouTubeKit, which is only published as a Swift package. Other plugins
+      # keep using CocoaPods.
+      - name: Enable Swift Package Manager
+        run: flutter config --enable-swift-package-manager
+
       - name: Bootstrap iOS platform folder (generate + configure)
         run: bash ./.github/scripts/ios_bootstrap.sh
         env:
