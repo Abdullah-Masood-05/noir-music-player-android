@@ -247,7 +247,10 @@ Discover works out of the box, with nothing to configure.
   (`https://noir-player-api.vercel.app`), the same one the desktop app uses.
 - **On iOS**, the phone also asks YouTube directly: it searches YouTube Music itself and
   [YouTubeKit](https://github.com/alexeichhorn/YouTubeKit) finds the song's audio. If that
-  fails, Discover falls back to Noir Player's server (or your own keys below).
+  fails, Discover falls back to Noir Player's server (or your own keys below). This is new on
+  iPhone: if a song won't play or download there, please
+  [open an issue](https://github.com/Abdullah-Masood-05/noir-music-player-android/issues) with the
+  message the app showed.
 
 If you have API keys of your own, you can add them in **Settings → Discover**. Any service
 you enter a key for is called directly with your key; the others keep going through
