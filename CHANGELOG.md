@@ -3,12 +3,16 @@
 Release notes for Noir Player. Each `## [x.y.z] - Title` section becomes the
 notes of the matching GitHub release.
 
-## [Unreleased]
+## [2.2.0] - Discover gets songs straight from YouTube on iPhone too
 
 ### ▶️ Discover (iOS)
 - **Discover now reaches YouTube from your iPhone too.** Like on Android, the phone searches YouTube Music itself and finds the song's audio with YouTubeKit, so playing and downloading no longer depend on the server's shared limit. If YouTube can't be reached that way, Discover falls back to the server as before.
 - **Downloads on iOS are faster and nicer**: several pieces at once with real progress, saved as M4A (YouTube's original audio, no re-encoding) with the album cover, title and artist inside.
 - This is new on iPhone. If a song won't play or download, please [open an issue](https://github.com/Abdullah-Masood-05/noir-music-player-android/issues) with the message the app showed, or say how it went in [Discussions](https://github.com/Abdullah-Masood-05/noir-music-player-android/discussions).
+
+### 📦 Installing
+- **Android:** nothing changed for Android in this release. 2.2.0 updates over 2.1.0 in place, and your playlists and settings stay as they are.
+- **iPhone / iPad:** sideload `NoirPlayer-iOS-v2.2.0-unsigned.ipa` the same way as before (for example with Sideloadly or AltStore).
 
 ## [2.1.0] - Discover gets songs straight from YouTube
 
