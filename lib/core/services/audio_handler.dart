@@ -445,7 +445,14 @@ class AudioPlayerHandler extends BaseAudioHandler {
     _initEqualizer();
     _playIntent = true;
     await _reclaimFocusIfLost();
-    await _player.play();
+    // play() only completes when playback stops, so waiting for it kept
+    // Discover's loading spinner going for the whole song. The song is
+    // loaded by now; loading errors were thrown above.
+    unawaited(
+      _player.play().catchError((Object e) {
+        if (kDebugMode) debugPrint('Discover playback stopped: $e');
+      }),
+    );
   }
 
   /// Play [songs] from the start, or in a random order from a random song.

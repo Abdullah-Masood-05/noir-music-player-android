@@ -58,10 +58,10 @@ class MusicDiscoveryService {
        _musicFolder = musicFolder,
        _audioQuery = audioQuery,
        _client = client,
-       _youtube = youtube ?? YouTubeNative();
+       _youtube = youtube ?? YouTubeNative(client: client);
 
-  /// YouTube on the phone (NewPipe Extractor): finds, plays and downloads
-  /// songs on Android.
+  /// YouTube on the phone (NewPipe Extractor on Android, YouTubeKit on
+  /// iOS): finds, plays and downloads songs.
   final YouTubeNative _youtube;
 
   /// The HTTP client, also used to stream YouTube audio while it plays.
@@ -165,21 +165,36 @@ class MusicDiscoveryService {
   /// The audio stream to play [track] from, and its YouTube video. With
   /// [videoId] (a retry) that video is used again instead of searching.
   ///
-  /// On Android NewPipe Extractor finds and resolves it on the phone (and
-  /// [ResolvedStream.youtube] says how to fetch it); elsewhere the backend
-  /// does.
+  /// The phone finds and resolves it on YouTube itself (and
+  /// [ResolvedStream.youtube] says how to fetch it). On iOS, where that's
+  /// newer, the backend is asked when it fails.
   Future<ResolvedStream> resolveStream(
     DiscoveredTrack track, {
     String? videoId,
   }) async {
     if (YouTubeNative.available) {
-      final audio = await _youtubeAudio(track, videoId: videoId);
-      return ResolvedStream(
-        videoId: audio.videoId,
-        url: audio.url,
-        youtube: audio,
-      );
+      try {
+        final audio = await _youtubeAudio(track, videoId: videoId);
+        return ResolvedStream(
+          videoId: audio.videoId,
+          url: audio.url,
+          youtube: audio,
+        );
+      } on DiscoverException {
+        if (!Platform.isIOS) rethrow;
+        try {
+          return await _resolveWithBackend(track, videoId);
+        } catch (_) {}
+        rethrow;
+      }
     }
+    return _resolveWithBackend(track, videoId);
+  }
+
+  Future<ResolvedStream> _resolveWithBackend(
+    DiscoveredTrack track,
+    String? videoId,
+  ) async {
     final id = videoId ?? await fetchYoutubeVideoId(track.name, track.artist);
     return ResolvedStream(videoId: id, url: await getDownloadUrl(id));
   }
@@ -304,14 +319,21 @@ class MusicDiscoveryService {
         return DownloadResult.permissionDenied;
       }
 
+      // On iOS, where finding songs on the phone is newer, the backend is
+      // asked when the phone finds nothing.
+      String? phoneError;
       if (YouTubeNative.available) {
-        return await _downloadWithYouTube(
+        final result = await _downloadWithYouTube(
           track,
           key,
           coverUrl: coverUrl,
           onProgress: onProgress,
-          onError: onError,
+          onError: (message) => phoneError = message,
         );
+        if (!Platform.isIOS || result != DownloadResult.noSource) {
+          if (phoneError != null) onError?.call(phoneError!);
+          return result;
+        }
       }
 
       final String mp3Url;
@@ -319,7 +341,7 @@ class MusicDiscoveryService {
         final videoId = await fetchYoutubeVideoId(track.name, track.artist);
         mp3Url = await getDownloadUrl(videoId);
       } on DiscoverException catch (e) {
-        onError?.call(e.message);
+        onError?.call(phoneError ?? e.message);
         return DownloadResult.noSource;
       }
 
@@ -347,7 +369,7 @@ class MusicDiscoveryService {
     }
   }
 
-  /// Android: the audio is fetched from YouTube on the phone into the app's
+  /// The audio is fetched from YouTube on the phone into the app's
   /// cache (with real progress), rebuilt as a normal M4A with the title,
   /// artist and cover inside, then moved into the music folder.
   Future<DownloadResult> _downloadWithYouTube(

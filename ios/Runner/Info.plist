@@ -61,6 +61,15 @@
 	<!-- Mirrors Android WAKE_LOCK / FOREGROUND_SERVICE_MEDIA_PLAYBACK: keep
 	     audio playing in the background and keep lock-screen / control-centre
 	     media controls alive (audio_service). -->
+	<!-- Discover plays YouTube songs through just_audio's small server on
+	     127.0.0.1 inside the app (it adds the headers YouTube wants). Allow
+	     plain HTTP to local addresses only; everything else stays HTTPS. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

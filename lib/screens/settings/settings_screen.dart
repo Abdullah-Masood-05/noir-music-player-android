@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -152,14 +154,16 @@ class SettingsScreen extends ConsumerWidget {
 
                 _SectionHeader('Discover'),
                 if (YouTubeNative.available)
-                  const ListTile(
-                    leading: Icon(Icons.phone_android_outlined),
-                    title: Text('Songs come straight from YouTube'),
+                  ListTile(
+                    leading: const Icon(Icons.phone_android_outlined),
+                    title: const Text('Songs come straight from YouTube'),
                     subtitle: Text(
                       'Your phone finds, plays and downloads songs on YouTube '
-                      'itself (with NewPipe Extractor), with no key or limit. '
+                      'itself (with ${Platform.isIOS ? 'YouTubeKit' : 'NewPipe Extractor'}), '
+                      'with no key or limit. '
                       "The trending list and search come from Last.fm through "
-                      "Noir Player's server, or with your own key below.",
+                      "Noir Player's server, or with your own key below."
+                      '${Platform.isIOS ? " If YouTube can't be reached that way, the server (or your own keys below) is used instead." : ''}',
                     ),
                   )
                 else
@@ -182,8 +186,9 @@ class SettingsScreen extends ConsumerWidget {
                     save: notifier.setLastFmApiKey,
                   ),
                 ),
-                // The phone reaches YouTube itself on Android, without these.
-                if (!YouTubeNative.available) ...[
+                // The phone reaches YouTube itself, without these. iOS still
+                // falls back to them.
+                if (!YouTubeNative.available || Platform.isIOS) ...[
                   ListTile(
                     leading: const Icon(Icons.key_outlined),
                     title: const Text('YouTube Data API key'),
