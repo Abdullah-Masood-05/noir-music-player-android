@@ -69,7 +69,10 @@ class PlayerScreen extends ConsumerWidget {
             Expanded(
               child: Center(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  // Room above the artwork for its glow: the scroll view
+                  // clips at its edges, which cut the glow off in a hard
+                  // line along the top of the cover.
+                  padding: const EdgeInsets.fromLTRB(24, 40, 24, 8),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
