@@ -3,6 +3,15 @@
 Release notes for Noir Player. Each `## [x.y.z] - Title` section becomes the
 notes of the matching GitHub release.
 
+## [2.2.1] - Player and Discover fixes
+
+### 🛠️ Fixes
+- **No more dark band above the album cover on the player.** The cover's glow was being cut off in a straight line along its top edge; it now fades out evenly all around.
+- **The loading circle on a Discover song stops once the song plays.** It used to keep spinning until the song ended; now the playing indicator takes its place as soon as the song starts.
+
+### 📦 Installing
+- **2.2.1 updates over 2.2.0 in place.** Your playlists and settings stay as they are.
+
 ## [2.2.0] - Discover gets songs straight from YouTube on iPhone too
 
 ### ▶️ Discover (iOS)
