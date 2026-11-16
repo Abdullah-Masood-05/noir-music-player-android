@@ -29,122 +29,100 @@
 
 ---
 
-## 📖 Table of Contents
+## 📖 Contents
 
-- [📦 Overview](#-overview)
 - [✨ Features](#-features)
 - [📥 Download](#-download)
-  - [Updating from 1.1.x](#updating-from-11x)
-- [🖥️ Noir Player for Desktop](#️-noir-player-for-desktop)
-- [🖼️ Screens](#️-screens)
-- [📁 Project Structure](#-project-structure)
-- [🚀 Getting Started](#-getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-  - [🔑 Discover Setup](#-discover-setup)
-  - [Running the App](#running-the-app)
-- [🏗️ Building / CI](#️-building--ci)
-- [🧭 How It Works](#-how-it-works)
-- [🛠️ Architecture](#️-architecture)
-- [📦 Dependencies](#-dependencies)
+- [🧭 Discover](#-discover)
+- [🖥️ Desktop version](#️-desktop-version)
+- [🛠️ Building from source](#️-building-from-source)
 - [🤝 Contributing](#-contributing)
 - [📄 License](#-license)
 
 ---
 
-## 📦 Overview
-
-Noir Player is a small, focused Flutter app that:
-
-1. **Loads your local audio files** from the device library.
-2. **Shows them in a tabbed library** (`Music`, `Audio`, `Albums`, `Artists`), with playlists one tap away.
-3. **Runs a background audio service**, so playback keeps going when the app is backgrounded or the screen is locked — with the song's title, artist and cover art on the standard media notification, which the lock screen, the Samsung Now Bar and other system media controls pick up.
-4. **Discovers new music** — browse trending tracks and search by name, then play or download any of them. On Android, songs come straight from YouTube through **[NewPipe Extractor](https://github.com/TeamNewPipe/NewPipeExtractor) running on your phone** (the library behind the NewPipe app), with no key or limit. Track lists come from Last.fm through **Noir Player's server**, or with your own Last.fm key in **Settings → Discover**.
-5. **Streams & downloads** — preview tracks and save them as MP3 to your device's music folder.
-6. **Tailors playback** — skip back / forward by your own seek interval, sleep timer, playback speed, resume‑after‑a‑call and more, all in a sectioned Settings page reached from the side drawer.
-
-> 🖥️ **On a computer?** [Noir Player for Desktop](https://github.com/Abdullah-Masood-05/noir-music-player-desktop) is the same player rebuilt in Rust for Windows, macOS and Linux.
-
----
-
 ## ✨ Features
 
-| Feature | Where | How it works |
-|---|---|---|
-| 🎼 **Tabbed Library** | `library_screen.dart` | Music / Audio / Albums / Artists via `on_audio_query` |
-| ▶️ **Now Playing** | `player_screen.dart` | Reactive UI bound to the now-playing and playback-state providers |
-| 🔊 **Background Playback** | `audio_handler.dart` | `audio_service` + `just_audio` with a standard media notification (title, artist, cover art) that the lock screen, Samsung Now Bar and other system media controls show |
-| 🧭 **Discover** | `discover_screen.dart` | Trending + search with album art, through Noir Player's server or your own keys |
-| ⬇️ **Download** | `music_discovery_service.dart` | The phone fetches the song's audio from YouTube (M4A, with its album cover, title and artist), saved straight into your Music folder, with duplicate‑download protection |
-| 🎚️ **Equalizer** | `equalizer_screen.dart` | Native equalizer bands and presets |
-| ⏱️ **Sleep Timer** | `sleep_timer_service.dart` | Auto‑pause after a chosen duration, with a live countdown |
-| ⏪ **Skip Back / Forward** | `player_screen.dart` | Back / forward buttons that jump by your seek interval (5–60 s or a custom 1–300 s, set in Settings → Playback), also used by the notification, lock screen and headset |
-| ⏩ **Playback Speed** | `audio_handler.dart` | 0.5×–2× without pitch change, persisted |
-| 📞 **Call / interruption handling** | `audio_handler.dart` | Resume after a call via `audio_session` |
-| ⚙️ **Persistent Settings** | `settings_service.dart` | Theme, playback, notification and Discover‑key options saved with `shared_preferences` |
+- **Your music library**: songs, albums, artists and folders from your device, with search, playlists and Favourites.
+- **Background playback**: keeps playing with the screen off. Title, artist and cover show in the notification, on the lock screen and in system media controls such as the Samsung Now Bar.
+- **Discover**: browse trending songs or search for any song, then play it or download it. No account or API key needed.
+- **Downloads with tags**: Discover downloads are saved as M4A at YouTube's original quality, with the album cover, title and artist inside the file.
+- **Equalizer** with bands and presets.
+- **Playback controls**: skip back / forward by your own interval (5–60 s or custom), 0.5×–2× speed without pitch change, a sleep timer, repeat and shuffle, and an Up Next queue.
+- **Pauses for calls** and other interruptions, and resumes afterwards.
+- **Dark, red-on-black design** with smooth animations.
 
 ---
 
 ## 📥 Download
 
-Every release on the **[Releases](https://github.com/Abdullah-Masood-05/noir-music-player-android/releases/latest)** page has
-an Android APK and an iOS build, plus a `SHA256SUMS` file to check your download against.
+Get the latest version from the **[Releases page](https://github.com/Abdullah-Masood-05/noir-music-player-android/releases/latest)**.
+Each release has a `SHA256SUMS` file to check your download against.
 
-**Android** — download `NoirPlayer-vX.Y.Z.apk` on your phone (Android 7.0 or newer), open it and tap
-**Install**. If Android asks, allow your browser or file manager to install unknown apps.
+### Android (7.0 or newer)
 
-Releases also carry smaller APKs built for one kind of processor, plus an App Bundle:
+Download `NoirPlayer-vX.Y.Z.apk` on your phone, open it and tap **Install**. If Android asks, allow your
+browser or file manager to install apps.
 
 | File | For |
 |---|---|
-| `NoirPlayer-vX.Y.Z.apk` | Every phone (universal). Pick this if unsure. |
-| `NoirPlayer-vX.Y.Z-arm64-v8a.apk` | Almost every phone from the last few years (64‑bit ARM). |
-| `NoirPlayer-vX.Y.Z-armeabi-v7a.apk` | Older 32‑bit ARM phones. |
+| `NoirPlayer-vX.Y.Z.apk` | Every phone. Pick this if you're unsure. |
+| `NoirPlayer-vX.Y.Z-arm64-v8a.apk` | Most phones from the last few years (smaller download). |
+| `NoirPlayer-vX.Y.Z-armeabi-v7a.apk` | Older 32-bit phones. |
 | `NoirPlayer-vX.Y.Z-x86_64.apk` | Emulators and x86 Chromebooks. |
 | `NoirPlayer-vX.Y.Z.aab` | App stores and `bundletool`; it can't be installed by tapping it. |
 
-Once you install one of the per‑processor APKs, keep updating with the same file. Android treats them as
-newer than the universal APK, so it won't install the universal one over them.
+Updates install over the previous version and keep your playlists and settings. If you start with one of
+the smaller per-processor APKs, keep updating with the same file. Coming from 1.1.x or older? Uninstall it
+first: 1.2.0 and later are signed with a new key.
 
-**iPhone / iPad** — download `NoirPlayer-iOS-vX.Y.Z-unsigned.ipa` and sideload it with a tool such as
-**Sideloadly** or **AltStore**, which signs it with your own Apple ID. It is built on GitHub Actions; see the
-[iOS build guide](docs/iOS_BUILD_GUIDE.md).
+### iPhone / iPad
 
-### Updating from 1.1.x
+Download `NoirPlayer-iOS-vX.Y.Z-unsigned.ipa` and sideload it with **Sideloadly** or **AltStore**, which sign it
+with your own Apple ID. See the [iOS build guide](docs/iOS_BUILD_GUIDE.md).
 
-Version 1.2.0 is signed with a new, permanent release key, so Android won't install it over an earlier
-version. Uninstall the old Noir Player first, then install 1.2.2. Playlists and settings stored on the
-device aren't carried over. From 1.2.0 on, updates install in place: 1.2.2 installs straight over 1.2.1 and 1.2.0.
-
-| Version | Notes |
-|---|---|
-| **v1.2.2** | The clear (✕) button in Library search empties the search box as well as the filter |
-| v1.2.1 | Skip back / forward buttons on the player, a seek interval of your choice in Settings → Playback, the real version in About, one‑time notification permission for pop‑up players |
-| v1.2.0 | Discover through Noir Player's server, your own keys in Settings → Discover, cleaner now‑playing info on system media controls, unsigned iOS IPA |
-| v1.1.3 | Instant Library tab switching, Back returns to Library |
-| v1.1.2 | Reliable downloads into your Music folder, choose the download folder |
-| v1.1.1 | Native equalizer (bands + presets) |
-| v1.1.0 | Music‑folder tab, repeat/shuffle, Discover plays in the main player, playlist/favourites fixes, immersive UI + animations |
-| v1.0.0 | Online discovery, downloads, media controls and full playback settings |
-| v0.2.0 | Firebase authentication (experimental, pre‑release) |
-| v0.1.0 | Initial local music player |
+What changed in each version is in the [changelog](CHANGELOG.md).
 
 ---
 
-## 🖥️ Noir Player for Desktop
+## 🧭 Discover
 
-Noir Player started here, on Android. The **[desktop edition](https://github.com/Abdullah-Masood-05/noir-music-player-desktop)** carries the
-same idea to the computer: a local library, the red‑on‑black look, and Discover — rebuilt
-from scratch in **Rust** with **GPUI Kit** rather than Flutter.
+Discover works out of the box.
 
-| | 📱 Mobile (this repo) | 🖥️ [Desktop](https://github.com/Abdullah-Masood-05/noir-music-player-desktop) |
+- **Songs come straight from YouTube, found by your phone.** No server is in between, so there's no shared
+  limit to run out of. Songs are looked up on YouTube Music first, so you get the official audio.
+  - **Android** uses [NewPipe Extractor](https://github.com/TeamNewPipe/NewPipeExtractor), the library behind
+    the NewPipe app.
+  - **iPhone** uses [YouTubeKit](https://github.com/alexeichhorn/YouTubeKit). If it can't get a song,
+    Discover falls back to Noir Player's server. This is new on iPhone; if a song won't play or download,
+    please [open an issue](https://github.com/Abdullah-Masood-05/noir-music-player-android/issues) with
+    the message the app showed.
+- **Trending songs and search** come from Last.fm through Noir Player's server, the same one the desktop app
+  uses.
+- **Album covers** are looked up by song and artist on [Deezer](https://developers.deezer.com/api) and
+  [iTunes Search](https://performance-partners.apple.com/search-api). Only the title and artist are sent.
+
+Android saves downloads to your Music folder (you can pick another in Settings). iPhone saves them in the
+app's own folder.
+
+**Your own API keys (optional).** In **Settings → Discover** you can add your own keys. A service with a key
+is called directly; the rest keep using the server. Keys are stored only on your device.
+
+| Key | Used on | Get one from |
 |---|---|---|
-| **Built with** | Flutter · Dart | Rust · GPUI Kit |
-| **Runs on** | Android · iOS (unsigned IPA) | Windows · macOS · Linux |
-| **Library** | Device audio via `on_audio_query` | Folder scanning, sorted A→Z under letter headings |
-| **Playback** | Background service, notification, lock‑screen & Now Bar controls | Desktop transport bar, click‑to‑seek, queue rail |
-| **Extras** | Sleep timer, playback speed | 5‑band equalizer, embedded lyrics, in‑app updates |
-| **Discover** | Last.fm search, YouTube → MP3 download, through Noir Player's server | The same services, through the same server |
+| Last.fm | Android and iPhone | [last.fm/api](https://www.last.fm/api/account/create) |
+| YouTube Data API v3 | iPhone (fallback only) | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) |
+| RapidAPI | iPhone (fallback only) | [rapidapi.com](https://rapidapi.com/) |
+
+Everything except Discover works offline.
+
+---
+
+## 🖥️ Desktop version
+
+**[Noir Player for Desktop](https://github.com/Abdullah-Masood-05/noir-music-player-desktop)** brings the same
+player and the same look to **Windows, macOS and Linux**. It's a separate app written in Rust, with folder
+scanning, an equalizer, embedded lyrics, in-app updates and Discover.
 
 <p>
   <a href="https://github.com/Abdullah-Masood-05/noir-music-player-desktop/releases/latest"><b>📥 Download for Windows, macOS or Linux</b></a>
@@ -152,257 +130,100 @@ from scratch in **Rust** with **GPUI Kit** rather than Flutter.
 
 ---
 
-## 🖼️ Screens
+## 🛠️ Building from source
 
-A **4‑tab bottom bar** plus a **hamburger drawer** for everything else:
-
-| Destination | Where | Description |
-|---|---|---|
-| 📚 **Library** | bottom bar | Your local songs, albums, artists |
-| 🎵 **Player** | bottom bar | The full "Now Playing" view (with speed & sleep‑timer actions) |
-| 🎶 **Playlists** | bottom bar | Create and browse playlists |
-| 🧭 **Discover** | bottom bar | Trending tracks, search, stream & download |
-| ⚙️ **Settings** | drawer | Appearance, playback, notification, timer & Discover options |
-| ⏱️ **Sleep Timer** | drawer | Start / cancel the auto‑stop timer |
-| ℹ️ **About** | drawer | App info |
-
----
-
-## 📁 Project Structure
-
-```
-lib/
-├── main.dart                      # App entry — loads settings + playlists, inits audio, ProviderScope
-├── core/
-│   ├── models/
-│   │   ├── playlist_model.dart          # Immutable playlists
-│   │   └── discovered_track.dart        # Discover/download track model
-│   ├── services/
-│   │   ├── audio_handler.dart           # Background audio, media controls, interruptions
-│   │   ├── discover_api.dart            # Discover requests: Noir Player's server or your own keys
-│   │   ├── music_discovery_service.dart # Last.fm + YouTube + MP3 download
-│   │   └── youtube_native.dart          # YouTube on the phone via NewPipe Extractor (Android)
-│   ├── state/                           # Riverpod providers
-│   │   ├── settings.dart                # Persisted user preferences
-│   │   ├── playlists.dart               # Playlists + Favourites, saved to playlists.json
-│   │   ├── playback.dart                # Audio handler + now-playing / position streams
-│   │   ├── library.dart                 # Media access, songs / albums / artists (queried once)
-│   │   ├── artwork.dart                 # In-memory artwork cache
-│   │   └── sleep_timer.dart             # Auto‑stop timer
-│   └── theme/
-│       └── app_theme.dart
-├── screens/
-│   ├── home/home_screen.dart      # Bottom nav + hamburger drawer shell
-│   ├── library/                   # Library + tabs (songs/albums/artists/playlists)
-│   ├── player/player_screen.dart
-│   ├── playlists/
-│   ├── albums/  artist/
-│   ├── discover/discover_screen.dart    # Discover + download UI
-│   ├── settings/settings_screen.dart    # Sectioned settings
-│   └── about/about_screen.dart
-└── widgets/
-    ├── mini_player.dart           # Now-playing bar above the navigation
-    ├── song_artwork.dart          # Cached artwork (device and web)
-    └── playback_menus.dart        # Sleep‑timer & playback‑speed bottom sheets
-
-third_party/
-└── audio_service/                 # audio_service 0.18.18, patched so lock-screen and
-                                   # media-panel buttons reach the app (OnePlus / Oppo / Vivo)
-```
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-| Requirement | Version |
-|---|---|
-| Flutter SDK | 3.35.7 (the version CI uses) |
-| Dart SDK | 3.9 (bundled with Flutter) |
-| Android | 7.0 (API 24)+ |
-
-```bash
-flutter --version
-```
-
-### Installation
+You need **Flutter 3.35.7** (the version CI uses, with Dart 3.9).
 
 ```bash
 git clone https://github.com/Abdullah-Masood-05/noir-music-player-android.git
-cd NoirPlayer
+cd noir-music-player-android
 flutter pub get
+flutter run
 ```
 
-### 🔑 Discover Setup
-
-Discover works out of the box, with nothing to configure.
-
-- **On Android**, finding, playing and downloading a song is done on the phone itself with
-  [NewPipe Extractor](https://github.com/TeamNewPipe/NewPipeExtractor), the library behind the
-  [NewPipe](https://github.com/TeamNewPipe/NewPipe) app. The phone asks YouTube directly, so
-  there's no API key, quota or server in between. When YouTube changes, an app update with a
-  newer NewPipe Extractor brings it back.
-- **The trending list and search** come from Last.fm through **Noir Player's server**
-  (`https://noir-player-api.vercel.app`), the same one the desktop app uses.
-- **On iOS**, the phone also asks YouTube directly: it searches YouTube Music itself and
-  [YouTubeKit](https://github.com/alexeichhorn/YouTubeKit) finds the song's audio. If that
-  fails, Discover falls back to Noir Player's server (or your own keys below). This is new on
-  iPhone: if a song won't play or download there, please
-  [open an issue](https://github.com/Abdullah-Masood-05/noir-music-player-android/issues) with the
-  message the app showed.
-
-If you have API keys of your own, you can add them in **Settings → Discover**. Any service
-you enter a key for is called directly with your key; the others keep going through
-Noir Player's server. Keys are stored on your device only, and clearing a field switches
-that service back to the server. On Android only the Last.fm key is shown, since the phone
-reaches YouTube itself; iOS keeps the YouTube and RapidAPI keys for its fallback.
-
-| Setting | Get a key from |
-|---|---|
-| Last.fm API key | https://www.last.fm/api/account/create |
-| YouTube Data API key (iOS) | https://console.cloud.google.com/apis/credentials (YouTube Data API v3) |
-| RapidAPI key (iOS) | https://rapidapi.com/ |
-
-> 💡 The rest of the app (local library + playback) works offline; only the Discover tab needs a connection.
-
-### Running the App
+Release builds:
 
 ```bash
-flutter run -d android
+flutter build apk --release                  # universal APK
+flutter build apk --release --split-per-abi  # one APK per processor type
+flutter build appbundle --release            # App Bundle
 ```
 
-> On first launch the app requests permission to read your music library and to download files. Grant them and the library populates automatically.
+iOS builds need a Mac with Swift Package Manager turned on
+(`flutter config --enable-swift-package-manager`), because YouTubeKit is only published as a Swift package.
+See the [iOS build guide](docs/iOS_BUILD_GUIDE.md).
 
----
+**CI and releases.** GitHub Actions runs `flutter analyze` and `flutter test` on every push, then builds the
+Android APKs and App Bundle (`ci.yml`) and an unsigned iOS IPA (`ios.yml`). Pushing a tag `vX.Y.Z` that matches
+`version:` in `pubspec.yaml` runs `release.yml`, which publishes those builds with checksums and the notes from
+[`CHANGELOG.md`](CHANGELOG.md). Android builds are release-signed when the `ANDROID_KEYSTORE_BASE64`,
+`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD` secrets are set.
 
-## 🏗️ Building / CI
-
-GitHub Actions does the building, with **Flutter 3.35.7**:
-
-- **Every push** runs `ci.yml` (`flutter analyze`, `flutter test`, then a universal release APK,
-  per‑ABI APKs for `arm64-v8a`, `armeabi-v7a` and `x86_64`, and an App Bundle) and `ios.yml`
-  (an unsigned IPA on a macOS runner). Both builds are kept as workflow artifacts for 30 days.
-- **Releases** publish what CI already built. Pushing a tag `vX.Y.Z` that matches the `version:` in
-  `pubspec.yaml` runs `release.yml`, which takes the Android builds and IPA from the green CI runs for the tagged
-  commit, adds checksums and the notes from [`CHANGELOG.md`](CHANGELOG.md), and creates the GitHub
-  release. Tag a commit once CI is green for it.
-- **Release signing:** the APKs and App Bundle are release‑signed when these repository secrets are set:
-  `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and
-  `ANDROID_KEY_PASSWORD`. Without them CI signs with a debug key, and `release.yml` won't publish
-  those builds.
-
-To build locally:
-
-```bash
-flutter build apk --release                  # build/app/outputs/flutter-apk/app-release.apk
-flutter build apk --release --split-per-abi  # build/app/outputs/flutter-apk/app-<abi>-release.apk
-flutter build appbundle --release            # build/app/outputs/bundle/release/app-release.aab
-```
-
----
-
-## 🧭 How It Works
+<details>
+<summary><b>Project layout</b></summary>
 
 ```
-┌─────────────────────┐     init      ┌──────────────────────┐
-│   main.dart          │ ───────────▶ │  AudioHandler        │
-│ (settings + audio)   │              │ (audio_service)      │
-└──────────┬──────────┘              └──────────────────────┘
-           │
-           ▼
-┌─────────────────────┐   bottom nav   ┌──────────────────────┐
-│   HomeScreen         │ ─────────────▶ │ Library / Player /   │
-│ (5-tab shell)        │                │ Playlists / Discover │
-└─────────────────────┘                └──────────┬───────────┘
-                                                   │ Discover
-                                                   ▼
-                                    ┌──────────────────────────────┐
-                                    │ MusicDiscoveryService         │
-                                    │ Last.fm → NewPipe → M4A → save │
-                                    └──────────────────────────────┘
+lib/
+├── main.dart                 # Start-up: settings, playlists, audio service
+├── core/
+│   ├── models/               # Playlists, Discover tracks
+│   ├── services/
+│   │   ├── audio_handler.dart            # Background playback, media controls, interruptions
+│   │   ├── discover_api.dart             # Last.fm and server requests
+│   │   ├── music_discovery_service.dart  # Discover: find, play and download songs
+│   │   ├── youtube_native.dart           # YouTube on the phone (NewPipe / YouTubeKit)
+│   │   ├── youtube_search.dart           # YouTube Music search (iPhone)
+│   │   └── cover_lookup.dart             # Album covers from Deezer and iTunes
+│   ├── state/                # Riverpod providers (settings, library, playback, playlists…)
+│   └── theme/
+├── screens/                  # Library, Player, Playlists, Discover, Equalizer, Settings, About…
+└── widgets/                  # Mini player, artwork, Up Next, menus…
+
+android/app/src/main/         # Kotlin side of Discover (NewPipe Extractor) and NewPipe's MP4 muxer
+packages/noir_youtube_ios/    # Swift side of Discover on iPhone (YouTubeKit)
+third_party/audio_service/    # audio_service 0.18.18, patched so lock-screen and
+                              # media-panel buttons work on OnePlus / Oppo / Vivo
 ```
 
-**Download flow (Android):** pick a track → NewPipe Extractor on the phone finds it on
-YouTube Music (or YouTube) and picks its best M4A audio → the audio is downloaded in 1 MiB
-ranges, with progress → NewPipe's MP4 muxer rebuilds YouTube's streaming-only (DASH) file as a
-normal M4A, with the album cover, title and artist inside → it's saved to the device's Music
-folder. Playing works the same way: the player streams the audio straight from YouTube,
-asking for it the way NewPipe's player does.
+</details>
 
-**On iOS** it's the same flow with different tools: the app searches YouTube Music (then
-YouTube) itself, YouTubeKit picks the best M4A audio, the app downloads it in 1 MiB ranges,
-and AVFoundation rebuilds it as a normal M4A with the cover, title and artist inside, without
-re-encoding. Downloads are saved in the app's Documents folder. If the phone can't get a song
-from YouTube, the YouTube lookup and MP3 link come from Noir Player's server instead, or
-directly with your own key for any service you added one for in Settings.
-
----
-
-## 🛠️ Architecture
-
-| File | Responsibility |
-|---|---|
-| `main.dart` | Loads settings and playlists, initialises the audio service, sets up the `ProviderScope`, theming & routes |
-| `core/state/` | Riverpod providers. Widgets watch only the values they show (e.g. play/pause, one song's heart), so a change rebuilds just those widgets |
-| `audio_handler.dart` | Wraps `audio_service` + `just_audio` for background playback and notifications |
-| `library_screen.dart` | Tabbed local library using `on_audio_query` |
-| `discover_screen.dart` | Discover UI — search, trending, preview-play, and per-track download progress |
-| `discover_api.dart` | Discover requests and response parsing — Noir Player's server, or each service directly with your own key |
-| `music_discovery_service.dart` | Last.fm metadata, YouTube lookup, RapidAPI MP3 resolution, and file saving |
-| `player_screen.dart` | Reactive "Now Playing" bound to the playback providers |
-
----
-
-## 📦 Dependencies
+<details>
+<summary><b>Main dependencies</b></summary>
 
 | Package | Purpose |
 |---|---|
-| [`just_audio`](https://pub.dev/packages/just_audio) | Audio playback (queue, speed, seeking) |
-| [`audio_service`](https://pub.dev/packages/audio_service) | Background playback + notification / lock‑screen controls |
-| [`audio_session`](https://pub.dev/packages/audio_session) | Audio focus & call/headset interruptions |
-| [`on_audio_query`](https://pub.dev/packages/on_audio_query) | Read the device's music library & artwork |
-| [`permission_handler`](https://pub.dev/packages/permission_handler) | Runtime permissions |
-| [`flutter_riverpod`](https://pub.dev/packages/flutter_riverpod) · [`shared_preferences`](https://pub.dev/packages/shared_preferences) | State & persistence |
-| [`http`](https://pub.dev/packages/http) | Networking & file download |
-| [`cached_network_image`](https://pub.dev/packages/cached_network_image) | Discover artwork, cached between launches |
-| [`path_provider`](https://pub.dev/packages/path_provider) | Locating device folders for downloads |
-| [`flutter_animate`](https://pub.dev/packages/flutter_animate) | UI animations |
-| [NewPipe Extractor](https://github.com/TeamNewPipe/NewPipeExtractor) (Android, Gradle) | Finds, plays and downloads Discover songs from YouTube on the phone |
-| [`okhttp`](https://square.github.io/okhttp/) (Android, Gradle) | NewPipe Extractor's HTTP client and the audio downloads |
+| [`just_audio`](https://pub.dev/packages/just_audio) · [`audio_service`](https://pub.dev/packages/audio_service) · [`audio_session`](https://pub.dev/packages/audio_session) | Playback, background service, notification and audio focus |
+| [`on_audio_query`](https://pub.dev/packages/on_audio_query) | The device's music library and artwork |
+| [`flutter_riverpod`](https://pub.dev/packages/flutter_riverpod) · [`shared_preferences`](https://pub.dev/packages/shared_preferences) | State and saved settings |
+| [`http`](https://pub.dev/packages/http) · [`cached_network_image`](https://pub.dev/packages/cached_network_image) | Networking and cached Discover artwork |
+| [`permission_handler`](https://pub.dev/packages/permission_handler) · [`path_provider`](https://pub.dev/packages/path_provider) | Permissions and folders |
+| [`flutter_animate`](https://pub.dev/packages/flutter_animate) | Animations |
+| [NewPipe Extractor](https://github.com/TeamNewPipe/NewPipeExtractor) · [OkHttp](https://square.github.io/okhttp/) | Discover on Android |
+| [YouTubeKit](https://github.com/alexeichhorn/YouTubeKit) | Discover on iPhone |
 
-> Discover album covers are looked up by song and artist in the [Deezer](https://developers.deezer.com/api) and [iTunes Search](https://performance-partners.apple.com/search-api) APIs (no account or key). Only the song title and artist are sent, and covers are cached on the device.
-
-> Run `flutter pub get` to install everything declared in `pubspec.yaml`.
+</details>
 
 ---
 
 ## 🤝 Contributing
 
-Pull requests are welcome! For major changes, please open an issue first to discuss what
-you'd like to change.
-
-1. Fork the repo
-2. Create a feature branch (`git checkout -b feature/amazing-thing`)
-3. Commit your changes
-4. Open a PR 🎉
+Pull requests are welcome. For bigger changes, please [open an issue](https://github.com/Abdullah-Masood-05/noir-music-player-android/issues)
+first so we can talk it through. Bug reports and ideas are welcome there too, or in
+[Discussions](https://github.com/Abdullah-Masood-05/noir-music-player-android/discussions).
 
 ---
 
 ## 📄 License
 
-Noir Player's own code is distributed under the **MIT License**. See [LICENSE](LICENSE) for details.
+Noir Player's own code is under the **MIT License**. See [LICENSE](LICENSE).
 
-The Android app bundles [NewPipe Extractor](https://github.com/TeamNewPipe/NewPipeExtractor) (GPL-3.0) and
-includes code taken from the [NewPipe](https://github.com/TeamNewPipe/NewPipe) app (GPL-3.0):
-its MP4 muxer under `android/app/src/main/java/org/schabi/newpipe/streams/` and
-`android/app/src/main/java/us/shandian/giga/io/`, and the downloader in
-`NewPipeDownloader.kt`. Those files stay under the GPL-3.0, and Android builds (APK / AAB) as
-a whole are distributed under the terms of the **GPL-3.0**; the complete source for them is
-this repository.
+The Android app includes [NewPipe Extractor](https://github.com/TeamNewPipe/NewPipeExtractor) and code from the
+[NewPipe](https://github.com/TeamNewPipe/NewPipe) app, both GPL-3.0: the MP4 muxer under
+`android/app/src/main/java/org/schabi/newpipe/streams/` and `android/app/src/main/java/us/shandian/giga/io/`,
+and `NewPipeDownloader.kt`. Those files stay under the GPL-3.0, and Android builds (APK / AAB) as a whole are
+distributed under the **GPL-3.0**; their complete source is this repository.
 
-The iOS app uses [YouTubeKit](https://github.com/alexeichhorn/YouTubeKit) (MIT) through the
-plugin in `packages/noir_youtube_ios/`.
+The iPhone app uses [YouTubeKit](https://github.com/alexeichhorn/YouTubeKit) (MIT).
 
 ---
 
