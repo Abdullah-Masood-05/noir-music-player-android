@@ -160,34 +160,6 @@ Android APKs and App Bundle (`ci.yml`) and an unsigned iOS IPA (`ios.yml`). Push
 `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD` secrets are set.
 
 <details>
-<summary><b>Project layout</b></summary>
-
-```
-lib/
-├── main.dart                 # Start-up: settings, playlists, audio service
-├── core/
-│   ├── models/               # Playlists, Discover tracks
-│   ├── services/
-│   │   ├── audio_handler.dart            # Background playback, media controls, interruptions
-│   │   ├── discover_api.dart             # Last.fm and server requests
-│   │   ├── music_discovery_service.dart  # Discover: find, play and download songs
-│   │   ├── youtube_native.dart           # YouTube on the phone (NewPipe / YouTubeKit)
-│   │   ├── youtube_search.dart           # YouTube Music search (iPhone)
-│   │   └── cover_lookup.dart             # Album covers from Deezer and iTunes
-│   ├── state/                # Riverpod providers (settings, library, playback, playlists…)
-│   └── theme/
-├── screens/                  # Library, Player, Playlists, Discover, Equalizer, Settings, About…
-└── widgets/                  # Mini player, artwork, Up Next, menus…
-
-android/app/src/main/         # Kotlin side of Discover (NewPipe Extractor) and NewPipe's MP4 muxer
-packages/noir_youtube_ios/    # Swift side of Discover on iPhone (YouTubeKit)
-third_party/audio_service/    # audio_service 0.18.18, patched so lock-screen and
-                              # media-panel buttons work on OnePlus / Oppo / Vivo
-```
-
-</details>
-
-<details>
 <summary><b>Main dependencies</b></summary>
 
 | Package | Purpose |
