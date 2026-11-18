@@ -132,7 +132,7 @@ scanning, an equalizer, embedded lyrics, in-app updates and Discover.
 
 ## 🛠️ Building from source
 
-You need **Flutter 3.50.0** (the version CI uses, with Dart 3.14) and JDK 17 for Android builds.
+You need **Flutter 3.50.0** (the version CI uses, with Dart 3.14) and JDK 21 for Android builds.
 
 ```bash
 git clone https://github.com/Abdullah-Masood-05/noir-music-player-android.git

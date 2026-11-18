@@ -50,7 +50,9 @@ env:
   # Flutter 3.50.0 stable (Dart 3.14.0): satisfies pubspec `sdk: ^3.14.0` and
   # the lockfile's Flutter floor. Keep ios.yml on the same version.
   FLUTTER_VERSION: '3.50.0'
-  JAVA_VERSION: '17'
+  # JDK 21: AGP 9's lint uses Java 21 APIs and crashes on 17. The app still
+  # compiles for Java 17 (android/app/build.gradle.kts).
+  JAVA_VERSION: '21'
 
 jobs:
   android:
