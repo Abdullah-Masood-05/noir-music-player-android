@@ -79,19 +79,20 @@ jobs:
           persist-credentials: false
 
       # Keep in step with FLUTTER_VERSION in ci.yml.
-      - name: Set up Flutter 3.35.7 (stable)
+      - name: Set up Flutter 3.50.0 (stable)
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
-          flutter-version: '3.35.7'
+          flutter-version: '3.50.0'
           cache: true
 
       - name: Verify Flutter
         run: flutter --version
 
       # The app's own iOS plugin (packages/noir_youtube_ios) pulls in
-      # YouTubeKit, which is only published as a Swift package. Other plugins
-      # keep using CocoaPods.
+      # YouTubeKit, which is only published as a Swift package. Swift Package
+      # Manager is on by default since Flutter 3.44; this keeps it on even if
+      # the runner's Flutter config says otherwise.
       - name: Enable Swift Package Manager
         run: flutter config --enable-swift-package-manager
 

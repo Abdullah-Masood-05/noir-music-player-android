@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "noir_youtube_ios",
     platforms: [
-        .iOS("13.0"),
+        .iOS("15.0"),
     ],
     products: [
         .library(name: "noir-youtube-ios", targets: ["noir_youtube_ios"]),

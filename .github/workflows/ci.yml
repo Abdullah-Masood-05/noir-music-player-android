@@ -47,9 +47,9 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  # Last 3.35.x stable (Dart 3.9.2): satisfies pubspec `sdk: ^3.9.0` and the
-  # lockfile's `flutter: ">=3.35.0"`. Keep ios.yml on the same version.
-  FLUTTER_VERSION: '3.35.7'
+  # Flutter 3.50.0 stable (Dart 3.14.0): satisfies pubspec `sdk: ^3.14.0` and
+  # the lockfile's Flutter floor. Keep ios.yml on the same version.
+  FLUTTER_VERSION: '3.50.0'
   JAVA_VERSION: '17'
 
 jobs:

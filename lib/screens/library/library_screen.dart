@@ -40,6 +40,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         content: Text(message),
         action: action,
         duration: Duration(seconds: action == null ? 4 : 6),
+        // Since Flutter 3.38 a SnackBar with an action stays until it's
+        // dismissed; this one is only a hint, so let it go by itself.
+        persist: false,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),

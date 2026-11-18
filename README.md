@@ -9,8 +9,8 @@
 <p>
   <a href="https://github.com/Abdullah-Masood-05/noir-music-player-android/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/Abdullah-Masood-05/noir-music-player-android?label=release&color=blue"></a>
   <a href="https://github.com/Abdullah-Masood-05/noir-music-player-android/releases/latest"><img alt="Downloads" src="https://img.shields.io/github/downloads/Abdullah-Masood-05/noir-music-player-android/total?color=brightgreen"></a>
-  <a href="https://flutter.dev"><img alt="Flutter" src="https://img.shields.io/badge/Flutter-3.35.7-02569B?logo=flutter&logoColor=white"></a>
-  <a href="https://dart.dev"><img alt="Dart" src="https://img.shields.io/badge/Dart-3.9+-0175C2?logo=dart&logoColor=white"></a>
+  <a href="https://flutter.dev"><img alt="Flutter" src="https://img.shields.io/badge/Flutter-3.50.0-02569B?logo=flutter&logoColor=white"></a>
+  <a href="https://dart.dev"><img alt="Dart" src="https://img.shields.io/badge/Dart-3.14+-0175C2?logo=dart&logoColor=white"></a>
   <img alt="Platform" src="https://img.shields.io/badge/Platform-Android%20%7C%20iOS-3DDC84?logo=android&logoColor=white">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-MIT-yellow.svg"></a>
   <a href="https://github.com/Abdullah-Masood-05/noir-music-player-android/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/Abdullah-Masood-05/noir-music-player-android?style=flat&logo=github&color=E53935"></a>
@@ -132,7 +132,7 @@ scanning, an equalizer, embedded lyrics, in-app updates and Discover.
 
 ## 🛠️ Building from source
 
-You need **Flutter 3.35.7** (the version CI uses, with Dart 3.9).
+You need **Flutter 3.50.0** (the version CI uses, with Dart 3.14) and JDK 17 for Android builds.
 
 ```bash
 git clone https://github.com/Abdullah-Masood-05/noir-music-player-android.git
@@ -149,9 +149,8 @@ flutter build apk --release --split-per-abi  # one APK per processor type
 flutter build appbundle --release            # App Bundle
 ```
 
-iOS builds need a Mac with Swift Package Manager turned on
-(`flutter config --enable-swift-package-manager`), because YouTubeKit is only published as a Swift package.
-See the [iOS build guide](docs/iOS_BUILD_GUIDE.md).
+iOS builds need a Mac with Xcode and use Swift Package Manager (on by default since Flutter 3.44), because
+YouTubeKit is only published as a Swift package. See the [iOS build guide](docs/iOS_BUILD_GUIDE.md).
 
 **CI and releases.** GitHub Actions runs `flutter analyze` and `flutter test` on every push, then builds the
 Android APKs and App Bundle (`ci.yml`) and an unsigned iOS IPA (`ios.yml`). Pushing a tag `vX.Y.Z` that matches

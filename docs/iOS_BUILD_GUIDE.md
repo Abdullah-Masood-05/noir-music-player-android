@@ -19,7 +19,7 @@ push / PR / manual / v* tag
    ▼
 macos-latest runner
    │
-   ├─ Set up Flutter 3.35.7 (same version as the Android CI workflow)
+   ├─ Set up Flutter 3.50.0 (same version as the Android CI workflow)
    ├─ Bootstrap ios/ platform folder         (flutter create --platforms=ios . + overlays)
    ├─ flutter pub get
    ├─ dart run flutter_launcher_icons        (iOS app icons from assets/icon/app_icon.png)
@@ -37,7 +37,7 @@ Because the generated Xcode project is not in git,
 
 | File | Purpose |
 |---|---|
-| `ios/Podfile` | Deployment target 13.0 + `permission_handler` macros |
+| `ios/Podfile` | Deployment target 15.0 + `permission_handler` macros |
 | `ios/Runner/Info.plist` | Permissions, background audio, display name |
 | `ios/ExportOptions.plist` | Signing/export method (`METHOD_PLACEHOLDER`, `TEAM_ID_PLACEHOLDER`) |
 
