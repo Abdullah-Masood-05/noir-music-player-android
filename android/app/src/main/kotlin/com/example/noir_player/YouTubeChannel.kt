@@ -262,22 +262,16 @@ class YouTubeChannel(private val context: Context, messenger: BinaryMessenger) :
 
     /**
      * The headers YouTube expects for a stream link, depending on which of
-     * its apps it was made for (the same rules as NewPipe's player).
+     * its apps it was made for (the same rules as NewPipe 0.29.3's player).
      */
     private fun streamHeaders(url: String): Map<String, String> {
         val headers = mutableMapOf<String, String>()
-        headers["User-Agent"] = when {
-            YoutubeParsingHelper.isAndroidStreamingUrl(url) ->
-                YoutubeParsingHelper.getAndroidUserAgent(null)
-            YoutubeParsingHelper.isIosStreamingUrl(url) ->
-                YoutubeParsingHelper.getIosUserAgent(null)
-            YoutubeParsingHelper.isVisionOsStreamingUrl(url) ->
-                YoutubeParsingHelper.getVisionOsUserAgent(null)
-            else -> NewPipeDownloader.USER_AGENT
+        headers["User-Agent"] = if (YoutubeParsingHelper.isVisionOsStreamingUrl(url)) {
+            YoutubeParsingHelper.getVisionOsUserAgent(null)
+        } else {
+            NewPipeDownloader.USER_AGENT
         }
-        if (YoutubeParsingHelper.isWebStreamingUrl(url) ||
-            YoutubeParsingHelper.isWebEmbeddedPlayerStreamingUrl(url)
-        ) {
+        if (YoutubeParsingHelper.isWebStreamingUrl(url)) {
             headers["Origin"] = "https://www.youtube.com"
             headers["Referer"] = "https://www.youtube.com"
             headers["Sec-Fetch-Dest"] = "empty"
