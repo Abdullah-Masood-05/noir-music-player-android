@@ -3,6 +3,22 @@
 Release notes for Noir Player. Each `## [x.y.z] - Title` section becomes the
 notes of the matching GitHub release.
 
+## [2.3.0] - Built on Flutter 3.50
+
+### ⚡ Under the hood
+- **Noir Player now runs on Flutter 3.50 and Dart 3.14** (it was on Flutter 3.35). That brings a year of Flutter fixes and speed-ups: smoother rendering with Impeller (Vulkan on Android, with OpenGL as a fallback on older phones), faster startup of the graphics engine, and lower touch latency on iPhone.
+- **Updated building blocks:** NewPipe Extractor 0.27.1 (the same version as the NewPipe app, so Discover keeps up with YouTube), audio_service 0.18.19 with Noir Player's OnePlus / Oppo / Vivo lock-screen button fix carried over, and newer versions of just_audio, Riverpod, the image cache and other packages.
+- Android builds now use Android Gradle Plugin 9, Kotlin 2.4 and Java 17.
+
+### ✨ New
+- **Predictive back gesture (Android 13+).** Swiping back now shows a preview of the screen you're going back to, and lets you change your mind half-way.
+
+### 📱 iPhone
+- Noir Player now needs **iOS 15 or newer**, and uses the scene-based app lifecycle Apple's newest Xcode requires.
+
+### 📦 Installing
+- **2.3.0 updates over 2.2.1 in place.** Your playlists and settings stay as they are.
+
 ## [2.2.1] - Player and Discover fixes
 
 ### 🛠️ Fixes
