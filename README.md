@@ -97,8 +97,9 @@ Discover works out of the box.
     Discover falls back to Noir Player's server. This is new on iPhone; if a song won't play or download,
     please [open an issue](https://github.com/Abdullah-Masood-05/noir-music-player-android/issues) with
     the message the app showed.
-- **Trending songs and search** come from Last.fm through Noir Player's server, the same one the desktop app
-  uses.
+- **Trending songs** come from Last.fm through Noir Player's server, the same one the desktop app uses.
+- **Search** asks YouTube Music directly, so popular songs come first and the one you mean is usually on
+  top. If YouTube Music can't answer, Discover falls back to Last.fm.
 - **Album covers** are looked up by song and artist on [Deezer](https://developers.deezer.com/api) and
   [iTunes Search](https://performance-partners.apple.com/search-api). Only the title and artist are sent.
 
