@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 2.4.0+20
+version: 2.4.1+21
 
 environment:
   sdk: ^3.14.0
@@ -60,10 +60,6 @@ dependencies:
 dependency_overrides:
   audio_service:
     path: third_party/audio_service
-  # on_audio_query_android 1.1.0 with a built-in-Kotlin-ready Android build
-  # (see third_party/on_audio_query_android/NOIR_PATCH.md).
-  on_audio_query_android:
-    path: third_party/on_audio_query_android
 
 dev_dependencies:
   flutter_launcher_icons: ^0.14.4

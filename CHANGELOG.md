@@ -3,6 +3,14 @@
 Release notes for Noir Player. Each `## [x.y.z] - Title` section becomes the
 notes of the matching GitHub release.
 
+## [2.4.1] - Library fix
+
+### 🛠️ Fixes
+- **Your library loads again.** In 2.4.0 the Music and Audio tabs could show "Could not load songs" (`lateinit property context has not been initialized`). The music-library plugin is back to the version 2.3.0 used. The new YouTube Music search from 2.4.0 stays.
+
+### 📦 Installing
+- **2.4.1 updates over 2.4.0 and 2.3.0 in place.** Your playlists and settings stay as they are.
+
 ## [2.4.0] - Discover search ranked by YouTube Music
 
 ### 🔎 Discover
