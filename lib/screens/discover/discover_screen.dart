@@ -82,7 +82,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
   }
 
   Future<void> _loadTrending() async {
-    final generation = _searchGeneration;
+    final generation = ++_searchGeneration;
     setState(() => _isLoading = true);
     try {
       final tracks = await _discoveryService.fetchTrendingTracks();
@@ -93,18 +93,18 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
         _isSearching = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _searchGeneration) return;
       setState(() => _isLoading = false);
       _showSnack(_errorText(e, 'Error loading trending'));
     }
   }
 
   Future<void> _searchSongs(String query) async {
-    final generation = ++_searchGeneration;
     if (query.trim().isEmpty) {
       _loadTrending();
       return;
     }
+    final generation = ++_searchGeneration;
     setState(() {
       _isLoading = true;
       _isSearching = true;

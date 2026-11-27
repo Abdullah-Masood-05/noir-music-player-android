@@ -98,13 +98,16 @@ class MusicDiscoveryService {
     String? videoId,
   }) async {
     final key = trackKey(track);
+    final exact = videoId ?? _knownVideoId(track);
     final cached = _resolved[key];
+    // A recent lookup counts only if it's the video this track came with:
+    // a Last.fm song of the same name may have cached another one.
     if (videoId == null &&
         cached != null &&
+        (exact == null || cached.audio.videoId == exact) &&
         DateTime.now().difference(cached.at) < _resolvedFor) {
       return cached.audio;
     }
-    final exact = videoId ?? _knownVideoId(track);
     final byName = YouTubeNative.searchQuery(track.name, track.artist);
     YouTubeAudio audio;
     try {

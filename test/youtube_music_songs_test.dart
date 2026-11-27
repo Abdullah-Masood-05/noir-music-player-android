@@ -344,7 +344,7 @@ void main() {
 
     test('a failing YouTube throws', () async {
       final search = YouTubeSearch(MockClient((_) async => _json({}, 503)));
-      await expectLater(search.songs('enemy'), throwsA(isA<Object>()));
+      await expectLater(search.songs('enemy'), throwsA(isA<http.ClientException>()));
     });
   });
 
@@ -551,6 +551,20 @@ void main() {
           throwsA(isA<DiscoverException>()),
         );
         expect(searches, isEmpty);
+      });
+
+      test('a cached name search is not reused for a track with an id', () async {
+        final discovery = phone();
+        final byName = await discovery.youtubeAudio(track(null));
+        expect(byName.videoId, 'ZVYuB_Wj9Zs');
+        calls.clear();
+        final exact = await discovery.youtubeAudio(track('dDRPzSM8SYs'));
+        expect(exact.videoId, 'dDRPzSM8SYs');
+        expect(calls.single.arguments, containsPair('videoId', 'dDRPzSM8SYs'));
+        // The exact lookup is cached now.
+        calls.clear();
+        await discovery.youtubeAudio(track('dDRPzSM8SYs'));
+        expect(calls, isEmpty);
       });
 
       test('a track without an id is searched for', () async {
