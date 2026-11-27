@@ -46,6 +46,9 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
   /// has started.
   int _playGeneration = 0;
 
+  /// Counts searches, so a slow older one can't replace a newer one's list.
+  int _searchGeneration = 0;
+
   String _keyFor(DiscoveredTrack t) => '${t.name}-${t.artist}';
 
   @override
@@ -79,10 +82,11 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
   }
 
   Future<void> _loadTrending() async {
+    final generation = _searchGeneration;
     setState(() => _isLoading = true);
     try {
       final tracks = await _discoveryService.fetchTrendingTracks();
-      if (!mounted) return;
+      if (!mounted || generation != _searchGeneration) return;
       setState(() {
         _tracks = tracks;
         _isLoading = false;
@@ -96,6 +100,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
   }
 
   Future<void> _searchSongs(String query) async {
+    final generation = ++_searchGeneration;
     if (query.trim().isEmpty) {
       _loadTrending();
       return;
@@ -106,13 +111,13 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
     });
     try {
       final tracks = await _discoveryService.searchTracks(query);
-      if (!mounted) return;
+      if (!mounted || generation != _searchGeneration) return;
       setState(() {
         _tracks = tracks;
         _isLoading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _searchGeneration) return;
       setState(() => _isLoading = false);
       _showSnack(_errorText(e, 'Error searching'));
     }

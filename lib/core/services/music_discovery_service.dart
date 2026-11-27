@@ -16,6 +16,7 @@ import 'discover_api.dart';
 import 'id3_tagger.dart';
 import 'stream_check.dart';
 import 'youtube_native.dart';
+import 'youtube_search.dart';
 
 /// Outcome of a download attempt.
 enum DownloadResult {
@@ -54,15 +55,20 @@ class MusicDiscoveryService {
     required OnAudioQuery audioQuery,
     required http.Client client,
     YouTubeNative? youtube,
+    YouTubeSearch? songSearch,
   }) : _api = DiscoverApi(keys: keys, client: client),
        _musicFolder = musicFolder,
        _audioQuery = audioQuery,
        _client = client,
-       _youtube = youtube ?? YouTubeNative(client: client);
+       _youtube = youtube ?? YouTubeNative(client: client),
+       _songSearch = songSearch ?? YouTubeSearch(client);
 
   /// YouTube on the phone (NewPipe Extractor on Android, YouTubeKit on
   /// iOS): finds, plays and downloads songs.
   final YouTubeNative _youtube;
+
+  /// Typed searches: YouTube Music's own ranking of songs.
+  final YouTubeSearch _songSearch;
 
   /// The HTTP client, also used to stream YouTube audio while it plays.
   http.Client get client => _client;
@@ -73,9 +79,21 @@ class MusicDiscoveryService {
   final Map<String, ({YouTubeAudio audio, DateTime at})> _resolved = {};
   static const Duration _resolvedFor = Duration(minutes: 30);
 
+  /// The video id [track] came with (from a YouTube Music search), if it's
+  /// a well-formed one.
+  static String? _knownVideoId(DiscoveredTrack track) {
+    final id = track.youtubeVideoId;
+    return id != null && _videoIdPattern.hasMatch(id) ? id : null;
+  }
+
+  static final RegExp _videoIdPattern = RegExp(r'^[A-Za-z0-9_-]{11}$');
+
   /// [track]'s YouTube audio: a recent lookup, or a new one. With
-  /// [videoId] (a retry) that video is resolved again, fresh.
-  Future<YouTubeAudio> _youtubeAudio(
+  /// [videoId] (a retry) that video is resolved again, fresh. A track that
+  /// came with its video uses it, and is searched for by name only if that
+  /// video can't be resolved.
+  @visibleForTesting
+  Future<YouTubeAudio> youtubeAudio(
     DiscoveredTrack track, {
     String? videoId,
   }) async {
@@ -86,12 +104,18 @@ class MusicDiscoveryService {
         DateTime.now().difference(cached.at) < _resolvedFor) {
       return cached.audio;
     }
-    final audio = await _youtube.resolve(
-      query: videoId == null
-          ? YouTubeNative.searchQuery(track.name, track.artist)
-          : null,
-      videoId: videoId,
-    );
+    final exact = videoId ?? _knownVideoId(track);
+    final byName = YouTubeNative.searchQuery(track.name, track.artist);
+    YouTubeAudio audio;
+    try {
+      audio = await _youtube.resolve(
+        query: exact == null ? byName : null,
+        videoId: exact,
+      );
+    } on DiscoverException {
+      if (videoId != null || exact == null) rethrow;
+      audio = await _youtube.resolve(query: byName);
+    }
     _resolved[key] = (audio: audio, at: DateTime.now());
     return audio;
   }
@@ -137,8 +161,19 @@ class MusicDiscoveryService {
   Future<List<DiscoveredTrack>> fetchTrendingTracks() => _api.fetchTrending();
 
   /// Search for tracks.
-  Future<List<DiscoveredTrack>> searchTracks(String query) =>
-      _api.search(query);
+  ///
+  /// YouTube Music is asked first, so the popular songs come first. If it
+  /// fails or finds nothing, Last.fm answers (and its error, if any, is the
+  /// one shown).
+  Future<List<DiscoveredTrack>> searchTracks(String query) async {
+    try {
+      final songs = await _songSearch.songs(query);
+      if (songs.isNotEmpty) return songs;
+    } catch (e) {
+      _logError('YouTube Music search failed: $e');
+    }
+    return _api.search(query);
+  }
 
   /// The id of the YouTube video that best matches the track.
   Future<String> fetchYoutubeVideoId(String trackName, String artistName) =>
@@ -174,7 +209,7 @@ class MusicDiscoveryService {
   }) async {
     if (YouTubeNative.available) {
       try {
-        final audio = await _youtubeAudio(track, videoId: videoId);
+        final audio = await youtubeAudio(track, videoId: videoId);
         return ResolvedStream(
           videoId: audio.videoId,
           url: audio.url,
@@ -195,7 +230,16 @@ class MusicDiscoveryService {
     DiscoveredTrack track,
     String? videoId,
   ) async {
-    final id = videoId ?? await fetchYoutubeVideoId(track.name, track.artist);
+    final known = videoId ?? _knownVideoId(track);
+    if (known != null) {
+      try {
+        return ResolvedStream(videoId: known, url: await getDownloadUrl(known));
+      } on DiscoverException {
+        // A retry fails as before; a song's own video falls back to a search.
+        if (videoId != null) rethrow;
+      }
+    }
+    final id = await fetchYoutubeVideoId(track.name, track.artist);
     return ResolvedStream(videoId: id, url: await getDownloadUrl(id));
   }
 
@@ -338,8 +382,7 @@ class MusicDiscoveryService {
 
       final String mp3Url;
       try {
-        final videoId = await fetchYoutubeVideoId(track.name, track.artist);
-        mp3Url = await getDownloadUrl(videoId);
+        mp3Url = (await _resolveWithBackend(track, null)).url;
       } on DiscoverException catch (e) {
         onError?.call(phoneError ?? e.message);
         return DownloadResult.noSource;
@@ -381,7 +424,7 @@ class MusicDiscoveryService {
   }) async {
     final YouTubeAudio audio;
     try {
-      audio = await _youtubeAudio(track);
+      audio = await youtubeAudio(track);
     } on DiscoverException catch (e) {
       onError?.call(e.message);
       return DownloadResult.noSource;
