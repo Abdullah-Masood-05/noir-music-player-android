@@ -194,6 +194,8 @@ The Android app includes [NewPipe Extractor](https://github.com/TeamNewPipe/NewP
 and `NewPipeDownloader.kt`. Those files stay under the GPL-3.0, and Android builds (APK / AAB) as a whole are
 distributed under the **GPL-3.0**; their complete source is this repository.
 
+`third_party/on_audio_query_android` is [on_audio_query_android](https://pub.dev/packages/on_audio_query_android) (BSD-3-Clause) with a modernised Android build; see its `NOIR_PATCH.md`.
+
 The iPhone app uses [YouTubeKit](https://github.com/alexeichhorn/YouTubeKit) (MIT).
 
 ---
