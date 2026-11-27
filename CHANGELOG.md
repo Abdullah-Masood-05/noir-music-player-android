@@ -3,6 +3,22 @@
 Release notes for Noir Player. Each `## [x.y.z] - Title` section becomes the
 notes of the matching GitHub release.
 
+## [2.4.0] - Discover search ranked by YouTube Music
+
+### 🔎 Discover
+- **Search now asks YouTube Music directly, so popular songs come first.** The song you mean is usually right at the top: searching "enemy" now shows Imagine Dragons & JID first instead of a list of lesser-known tracks. If YouTube Music can't answer, search falls back to Last.fm as before. The trending list still comes from Last.fm.
+- **Playing or downloading a search result uses that exact song**, instead of looking it up again by name, so you get the version you tapped.
+- **Search results show YouTube Music's square covers**, and downloads embed them.
+
+### 🛠️ Fixes
+- A slow, older search can no longer replace the results of a newer one, including after you clear the search box.
+
+### ⚙️ Under the hood
+- The music-library plugin (`on_audio_query`) is now bundled with the app and built with Flutter's current Kotlin setup, so the app keeps building with future Flutter versions. How your library is read hasn't changed.
+
+### 📦 Installing
+- **2.4.0 updates over 2.3.0 in place.** Your playlists and settings stay as they are.
+
 ## [2.3.0] - Built on Flutter 3.50
 
 ### ⚡ Under the hood
