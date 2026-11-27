@@ -14,4 +14,4 @@ This build exists only to show Noir Player in **OnePlus / OPPO Live Alerts** (th
 - OnePlus can change its allowlist at any time, so the pill may stop appearing after a system update. OxygenOS 16 shows any music player as a Live Alert, so this build isn't needed there.
 - It doesn't receive in-place updates from the normal Noir Player releases.
 
-**This build:** Noir Player {version}, the same code as the official 2.4.0 release: Discover search now asks **YouTube Music** directly, so popular songs come first, and playing or downloading a result uses that exact song; the music-library plugin is bundled with the app and built with Flutter's current Kotlin setup. It updates the previous Noir Player Live build in place — same package name and signing key.
+**This build:** Noir Player {version}, the same code as the official 2.4.1 release: the library loads again (the music-library plugin is back to the version 2.3.0 used), and Discover search still asks **YouTube Music** directly, so popular songs come first. It updates the previous Noir Player Live build in place — same package name and signing key.
