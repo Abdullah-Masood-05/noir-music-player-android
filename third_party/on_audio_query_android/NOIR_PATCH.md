@@ -2,7 +2,7 @@
 
 This is [on_audio_query_android](https://pub.dev/packages/on_audio_query_android) 1.1.0
 from pub.dev (the `example/` and `test/` folders left out), under its original
-BSD 3-Clause licence (see `LICENSE`). Only the Android build setup changed. No Kotlin
+BSD 3-Clause licence (see `LICENSE`). Only the Android build setup and the package's SDK constraints changed. No Kotlin
 source was touched and the Dart API is the same.
 
 The 1.1.0 release is unmaintained and its build file dates from AGP 4.1 / Kotlin 1.6.
